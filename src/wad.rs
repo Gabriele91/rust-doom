@@ -127,7 +127,6 @@ impl<'a> std::ops::Index<usize> for DirectoryList<'a> {
     }
 }
 
-
 pub struct Reader {
     pub pathfile : String,
     pub buffer : Vec<u8>,
