@@ -128,18 +128,18 @@ impl<'a> std::ops::Index<usize> for DirectoryList<'a> {
 }
 
 
-pub struct Reader<'a> {
-    pub pathfile : &'a str,
+pub struct Reader {
+    pub pathfile : String,
     pub buffer : Vec<u8>,
 }
 
-impl<'a>  Reader<'a> {
+impl  Reader {
 
-    pub fn new(wadfile: &'a str) -> Option<Self> {
+    pub fn new(wadfile: String) -> Option<Self> {
         if let Ok(file_buffer) = fs::read(&wadfile) {
             return {
                 let reader = Reader {
-                    pathfile: &wadfile,
+                    pathfile: wadfile,
                     buffer: file_buffer,
                 };
                 if let Some(header) = reader.header() {
@@ -161,14 +161,14 @@ impl<'a>  Reader<'a> {
         return None
     }
 
-    pub fn directories<'b>(&'b self) -> Option< DirectoryList<'b> > {
+    pub fn directories<'a>(&'a self) -> Option< DirectoryList<'a> > {
         if  let Some(&ref header) = self.header() {
             let size_of_header_dir = mem::size_of::<Directory>() as usize;
             let start = header.directory_offset as usize;
             let end = start + header.directory_count as usize * size_of_header_dir;
-            let mut out: DirectoryList<'b> = DirectoryList::new(header.directory_offset as usize);
+            let mut out: DirectoryList<'a> = DirectoryList::new(header.directory_offset as usize);
             for dir_offset in (start..end).step_by(size_of_header_dir){
-                let directory: &'b Directory = unsafe { mem::transmute(&self.buffer[dir_offset]) };
+                let directory: &'a Directory = unsafe { mem::transmute(&self.buffer[dir_offset]) };
                 out.push(directory);
             }
             return Some(out);
