@@ -1,6 +1,6 @@
 use std::{mem, vec};
 use std::rc::Rc;
-use crate::{math, render};
+use crate::math;
 use crate::math::Vec2;
 use crate::wad;
 

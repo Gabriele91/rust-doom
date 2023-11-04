@@ -1,45 +1,53 @@
 // Using engine
+use crate::actors::Actor;
 use crate::window::DoomSurface;
 
 // Trait
 pub trait Render {
-    fn draw(&self, surface: &mut DoomSurface);
+    fn draw(&self, surface: &mut DoomSurface, actors: &Vec<Box<dyn Actor>>);
 }
 
 pub mod Render2D {
-    use pixels::wgpu::Surface;
-
     // Use engine
     use crate::map::Map;
     use crate::map::Vertex;
     use crate::math;
     use crate::math::Vec2;
     use crate::window::DoomSurface;
+    use crate::actors::Actor;
 
     // Render 2D map
     pub struct RenderMap<'wad> {
         map: Box<Map<'wad>>,
+        bounds: [Vec2<i16>; 2],
+        size: Vec2<i32>,
+        offset: Vec2<i32>,
         vertices: Vec<Vec2<i32>>,
     }
 
     impl<'wad> RenderMap<'wad> {
         pub fn new(map: &Box<Map<'wad>>, size: Vec2<i32>, offset: Vec2<i32>) -> Self {
+            let bounds = RenderMap::<'wad>::bound_from_vertices(&map.vertices);
+            let vertices = RenderMap::remap_all_vertices(&map.vertices, &bounds, &size, &offset);
             RenderMap {
                 map: map.clone(),
-                vertices: RenderMap::remap_all_vertices(&map.vertices, size, offset),
+                bounds: bounds,
+                size: size,
+                offset: offset,
+                vertices: vertices,
             }
         }
 
         fn remap_all_vertices(
             map_vertices: &Vec<&'wad Vertex>,
-            size: Vec2<i32>,
-            offset: Vec2<i32>,
+            bounds: &[Vec2<i16>; 2],
+            size: &Vec2<i32>,
+            offset: &Vec2<i32>,
         ) -> Vec<Vec2<i32>> {
             let mut vertices = vec![];
-            let bounds = RenderMap::<'wad>::bound_from_vertices(&map_vertices);
             for vertex in map_vertices {
                 vertices.push(RenderMap::<'wad>::remap_vertex(
-                    &bounds, &vertex, &offset, &size,
+                    &vertex, &bounds, &offset, &size,
                 ));
             }
             return vertices;
@@ -58,8 +66,8 @@ pub mod Render2D {
         }
 
         fn remap_vertex(
-            bounds: &[Vec2<i16>; 2],
             vertex: &Vertex,
+            bounds: &[Vec2<i16>; 2],
             surf_min: &Vec2<i32>,
             surf_max: &Vec2<i32>,
         ) -> Vec2<i32> {
@@ -75,7 +83,7 @@ pub mod Render2D {
     }
 
     impl crate::render::Render for RenderMap<'_> {
-        fn draw(&self, surface: &mut DoomSurface) {
+        fn draw(&self, surface: &mut DoomSurface, actors: &Vec<Box<dyn Actor>>) {
             // Draw lines
             for line_def in &self.map.line_defs {
                 // draw point
@@ -90,6 +98,19 @@ pub mod Render2D {
                 // draw point
                 surface.draw(&vertex.as_vec::<usize>(), &[0xFF, 0xFF, 0xFF, 0xFF]);
             }
+            // Draw player 1
+            match actors.iter().find(|&actor| actor.id() == 1) {
+                Some(actor) => {
+                    let player_position = RenderMap::remap_vertex(
+                        &actor.position().as_vec::<i16>(), 
+                        &self.bounds, 
+                        &self.offset, 
+                        &self.size
+                    );
+                    surface.draw(&player_position.as_vec::<usize>(), &[0x00, 0x00, 0xFF, 0xFF]);
+                },
+                None => ()
+            } 
         }
     }
 }
