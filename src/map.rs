@@ -7,25 +7,27 @@ use crate::wad;
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
+#[readonly::make]
 pub struct Thing {
-    position: Vec2<i16>,
-    angle: u16,
-    thing_type: u16, 
-    flags: u16,
+    pub position: Vec2<i16>,
+    pub angle: u16,
+    pub thing_type: u16, 
+    pub flags: u16,
 }
 
 // Def a Line
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
+#[readonly::make]
 pub struct LineDef {
-    start_vertex_: u16,
-    end_vertex: u16,
-    flag: u16, 
-    line_type: u16, 
-    sector_tag :u16,
-    right_sidedef :u16,
-    left_sidedef :u16,
+    pub start_vertex_id: u16,
+    pub end_vertex_id: u16,
+    pub flag: u16, 
+    pub line_type: u16, 
+    pub sector_tag :u16,
+    pub right_sidedef :u16,
+    pub left_sidedef :u16,
 }
 
 // Def a vertex
@@ -34,43 +36,47 @@ pub type Vertex = math::Vec2<i16>;
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
+#[readonly::make]
 pub struct SubSector {
-    seg_count: u16,
-    first_seg_id: u16,
+    pub seg_count: u16,
+    pub first_seg_id: u16,
 }
 
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
+#[readonly::make]
 pub struct Seg {
-    start_vertex_id: u16, 
-    end_vertex_id: u16, 
-    angle: u16,
-    line_def_id: u16,
-    direction: u16, // 0 same as linedef, 1 opposite of linedef
-    offset: u16,    // distance along linedef to start of seg
+    pub start_vertex_id: u16, 
+    pub end_vertex_id: u16, 
+    pub angle: u16,
+    pub line_def_id: u16,
+    pub direction: u16, // 0 same as linedef, 1 opposite of linedef
+    pub offset: u16,    // distance along linedef to start of seg
 }
 
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
+#[readonly::make]
 pub struct NodeBox {
-    top: i16,
-    bottom: i16,
-    left: i16,
-    right: i16
+    pub top: i16,
+    pub bottom: i16,
+    pub left: i16,
+    pub right: i16
 }
 
 #[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
+#[readonly::make]
 pub struct Node {
-    partition: Vec2<i16>,
-    change_partition: Vec2<i16>,
-    right_box: NodeBox,
-    left_box: NodeBox,
-    right_child_id: u16,
-    left_child_id:  u16,
+    pub partition: Vec2<i16>,
+    pub change_partition: Vec2<i16>,
+    pub right_box: NodeBox,
+    pub left_box: NodeBox,
+    pub right_child_id: u16,
+    pub left_child_id:  u16,
 }
 
 #[allow(dead_code)]

@@ -97,6 +97,36 @@ impl DoomSurface {
             }
         }
     }
+
+    pub fn draw_line(&mut self, from: &Vec2<i32>, to: &Vec2<i32>, color: &[u8]){
+        let dx = (to.x - from.x).abs();
+        let dy = (to.y - from.y).abs();
+    
+        let step_x = if to.x > from.x { 1 } else { -1 };
+        let step_y = if to.y > from.y { 1 } else { -1 };
+    
+        let mut x = from.x;
+        let mut y = from.y;
+    
+        let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
+    
+        while x != to.x || y != to.y {
+            self.draw(&Vec2::new(x as usize, y as usize), color);
+    
+            let err2 = err;
+    
+            if err2 > -dx {
+                err -= dy;
+                x += step_x;
+            }
+    
+            if err2 < dy {
+                err += dx;
+                y += step_y;
+            }
+        }
+    }
+
 }
 
 impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {

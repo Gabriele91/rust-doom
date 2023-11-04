@@ -35,7 +35,7 @@ struct Doom<'wad>{
 fn main() {
     let doom1 = Rc::new(wad::Reader::new(String::from("assets/DOOM1.WAD")).unwrap());
     let map_e1m1 = Box::new(map::Map::new(&doom1, &String::from("E1M1")).unwrap());
-    let render_map = Box::new(RenderMap::new_with_padding(&map_e1m1, Vec2::new(20, 20)));
+    let render_map = Box::new(RenderMap::new(&map_e1m1, Vec2::new(280, 200), Vec2::new(20, 20)));
 
     let event_loop = EventLoop::new();
     let window = doom_window(
