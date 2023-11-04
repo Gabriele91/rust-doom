@@ -1,5 +1,6 @@
-use std::mem;
-use crate::math;
+use std::{mem, vec};
+use std::rc::Rc;
+use crate::{math, render};
 use crate::math::Vec2;
 use crate::wad;
 
@@ -87,8 +88,9 @@ pub enum MAPLUMPSINDEX {
     COUNT = 11
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct Map<'a> {
+        reader : Rc<wad::Reader>,
     pub things : Vec<&'a Thing>,
     pub line_defs : Vec<&'a LineDef>,
     pub vertices : Vec<&'a Vertex>,
@@ -98,23 +100,32 @@ pub struct Map<'a> {
 }
 
 impl<'a> Map<'a> {
-    pub fn new(reader: &'a wad::Reader, name: &String) -> Option<Self> {
+    pub fn new(reader: &Rc<wad::Reader>, name: &String) -> Option<Self> {
         if let Some(directories) = reader.directories() {
             if let Some(map_dir_id) = directories.index_of(&name) {
-                return Some(Map {
-                    things: Map::extract::<Thing>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::THINGS as usize]), 
-                    line_defs: Map::extract::<LineDef>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::LINEDEFS as usize]),
-                    vertices: Map::extract::<Vertex>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::VERTEXES as usize]),
-                    sectors: Map::extract::<Seg>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::SEGS as usize]),
-                    sub_sectors: Map::extract::<SubSector>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::SSECTORS as usize]),
-                    nodes: Map::extract::<Node>(&reader.buffer, &directories[map_dir_id + MAPLUMPSINDEX::NODES as usize]),
-                })
+                let mut map = Map {
+                    reader: reader.clone(),
+                    things: vec![], 
+                    line_defs: vec![], 
+                    vertices: vec![], 
+                    sectors: vec![], 
+                    sub_sectors: vec![],  
+                    nodes: vec![], 
+                };
+                map.things = map.extract::<Thing>(&directories[map_dir_id + MAPLUMPSINDEX::THINGS as usize]);
+                map.line_defs = map.extract::<LineDef>(&directories[map_dir_id + MAPLUMPSINDEX::LINEDEFS as usize]);
+                map.vertices = map.extract::<Vertex>(&directories[map_dir_id + MAPLUMPSINDEX::VERTEXES as usize]);
+                map.sectors = map.extract::<Seg>(&directories[map_dir_id + MAPLUMPSINDEX::SEGS as usize]);
+                map.sub_sectors = map.extract::<SubSector>(&directories[map_dir_id + MAPLUMPSINDEX::SSECTORS as usize]);
+                map.nodes = map.extract::<Node>(&directories[map_dir_id + MAPLUMPSINDEX::NODES as usize]);
+                return Some(map)
             }
         }
         return None
     }
 
-    fn extract<T>(buffer: &'a [u8], directory: &'a wad::Directory) -> Vec<&'a T> {
+    fn extract<T>(&self, directory: &wad::Directory) -> Vec<&'a T> {
+        let buffer = &self.reader.buffer;
         let mut vec_t = vec![];   
         for chunk_offset in directory.data::<T>() {
             let value: &'a T = unsafe { mem::transmute(&buffer[chunk_offset]) };
