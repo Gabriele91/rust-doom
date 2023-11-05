@@ -1,6 +1,6 @@
 
 // Engine
-use crate::math::Vec2;
+use crate::math::Vector2;
 use crate::map::Thing;
 use crate::doom::Doom;
 
@@ -12,14 +12,14 @@ pub trait Actor {
     fn update<'wad>(&self, engine: &Doom<'wad>);
     fn control(&self, input: &WinitInputHelper);
     fn type_id(&self) -> u16;
-    fn position(&self) -> &Vec2<i16>;
+    fn position(&self) -> &Vector2<i16>;
     fn angle(&self) -> u16;
     fn flags(&self) -> u16;
 }
 
 pub struct Player {
     pub type_id: u16,
-    pub position: Vec2<i16>,
+    pub position: Vector2<i16>,
     pub angle: u16,
     pub flags: u16
 }
@@ -49,7 +49,7 @@ impl Actor for Player {
         self.type_id
     }
     
-    fn position(&self) -> &Vec2<i16>{
+    fn position(&self) -> &Vector2<i16>{
         &self.position
     }
     

@@ -1,7 +1,7 @@
 use std::{mem, vec};
 use std::rc::Rc;
 use crate::math;
-use crate::math::Vec2;
+use crate::math::Vector2;
 use crate::wad;
 
 #[repr(packed)]
@@ -9,7 +9,7 @@ use crate::wad;
 #[derive(Debug)]
 #[readonly::make]
 pub struct Thing {
-    pub position: Vec2<i16>,
+    pub position: Vector2<i16>,
     pub angle: u16,
     pub type_id: u16, 
     pub flags: u16,
@@ -31,7 +31,7 @@ pub struct LineDef {
 }
 
 // Def a vertex
-pub type Vertex = math::Vec2<i16>;
+pub type Vertex = math::Vector2<i16>;
 
 #[repr(packed)]
 #[allow(dead_code)]
@@ -71,8 +71,8 @@ pub struct NodeBox {
 #[derive(Debug)]
 #[readonly::make]
 pub struct Node {
-    pub partition: Vec2<i16>,
-    pub change_partition: Vec2<i16>,
+    pub partition: Vector2<i16>,
+    pub change_partition: Vector2<i16>,
     pub right_box: NodeBox,
     pub left_box: NodeBox,
     pub right_child_id: u16,

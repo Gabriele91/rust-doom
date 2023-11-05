@@ -12,21 +12,21 @@ pub mod render_2d {
     use crate::map::Map;
     use crate::map::Vertex;
     use crate::math;
-    use crate::math::Vec2;
+    use crate::math::Vector2;
     use crate::window::DoomSurface;
     use crate::actors::Actor;
 
     // Render 2D map
     pub struct RenderMap<'wad> {
         map: Box<Map<'wad>>,
-        bounds: [Vec2<i16>; 2],
-        size: Vec2<i32>,
-        offset: Vec2<i32>,
-        vertices: Vec<Vec2<i32>>,
+        bounds: [Vector2<i16>; 2],
+        size: Vector2<i32>,
+        offset: Vector2<i32>,
+        vertices: Vec<Vector2<i32>>,
     }
 
     impl<'wad> RenderMap<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vec2<i32>, offset: Vec2<i32>) -> Self {
+        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
             let bounds = RenderMap::<'wad>::bound_from_vertices(&map.vertices);
             let vertices = RenderMap::remap_all_vertices(&map.vertices, &bounds, &size, &offset);
             RenderMap {
@@ -40,10 +40,10 @@ pub mod render_2d {
 
         fn remap_all_vertices(
             map_vertices: &Vec<&'wad Vertex>,
-            bounds: &[Vec2<i16>; 2],
-            size: &Vec2<i32>,
-            offset: &Vec2<i32>,
-        ) -> Vec<Vec2<i32>> {
+            bounds: &[Vector2<i16>; 2],
+            size: &Vector2<i32>,
+            offset: &Vector2<i32>,
+        ) -> Vec<Vector2<i32>> {
             let mut vertices = vec![];
             for vertex in map_vertices {
                 vertices.push(RenderMap::<'wad>::remap_vertex(
@@ -53,9 +53,9 @@ pub mod render_2d {
             return vertices;
         }
 
-        fn bound_from_vertices(vertices: &Vec<&'wad Vertex>) -> [Vec2<i16>; 2] {
-            let mut bound_min = Vec2::new(std::i16::MAX, std::i16::MAX);
-            let mut bound_max = Vec2::new(std::i16::MIN, std::i16::MIN);
+        fn bound_from_vertices(vertices: &Vec<&'wad Vertex>) -> [Vector2<i16>; 2] {
+            let mut bound_min = Vector2::new(std::i16::MAX, std::i16::MAX);
+            let mut bound_max = Vector2::new(std::i16::MIN, std::i16::MIN);
             for vertex in vertices {
                 bound_min.x = math::min(bound_min.x, vertex.x);
                 bound_min.y = math::min(bound_min.y, vertex.y);
@@ -67,11 +67,11 @@ pub mod render_2d {
 
         fn remap_vertex(
             vertex: &Vertex,
-            bounds: &[Vec2<i16>; 2],
-            surf_min: &Vec2<i32>,
-            surf_max: &Vec2<i32>,
-        ) -> Vec2<i32> {
-            Vec2 {
+            bounds: &[Vector2<i16>; 2],
+            surf_min: &Vector2<i32>,
+            surf_max: &Vector2<i32>,
+        ) -> Vector2<i32> {
+            Vector2 {
                 x: (((vertex.x - bounds[0].x) as i32 * (surf_max.x - surf_min.x)) as f32
                     / (bounds[1].x - bounds[0].x) as f32) as i32
                     + surf_min.x,
@@ -96,18 +96,18 @@ pub mod render_2d {
             // Draw screen points
             for vertex in &self.vertices {
                 // draw point
-                surface.draw(&vertex.as_vec::<usize>(), &[0xFF, 0xFF, 0xFF, 0xFF]);
+                surface.draw(&Vector2::<usize>::from(&vertex), &[0xFF, 0xFF, 0xFF, 0xFF]);
             }
             // Draw player 1
             match actors.iter().find(|&actor| actor.type_id() == 1) {
                 Some(actor) => {
                     let player_position = RenderMap::remap_vertex(
-                        &actor.position().as_vec::<i16>(), 
+                        &actor.position(), 
                         &self.bounds, 
                         &self.offset, 
                         &self.size
                     );
-                    surface.draw(&player_position.as_vec::<usize>(), &[0x00, 0x00, 0xFF, 0xFF]);
+                    surface.draw(&Vector2::<usize>::from(&player_position), &[0x00, 0x00, 0xFF, 0xFF]);
                 },
                 None => ()
             } 

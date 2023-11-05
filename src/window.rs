@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::sync::Arc;
 // Using, d3d
-use crate::math::Vec2;
+use crate::math::Vector2;
 use crate::time::{
     TimeTrait,
     Time
@@ -78,7 +78,7 @@ impl DoomSurface {
         self.pixels.render()
     }
 
-    pub fn draw(&mut self, position: &Vec2<usize>, color: &[u8]) {
+    pub fn draw(&mut self, position: &Vector2<usize>, color: &[u8]) {
         let size = self.pixels.texture().size();
         let channels = self.pixels.texture().format().block_size(None).unwrap() as usize;
         if position.x >= size.width as usize || position.y >= size.height as usize {
@@ -98,7 +98,7 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_line(&mut self, from: &Vec2<i32>, to: &Vec2<i32>, color: &[u8]){
+    pub fn draw_line(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
         let dx = (to.x - from.x).abs();
         let dy = (to.y - from.y).abs();
     
@@ -111,7 +111,7 @@ impl DoomSurface {
         let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
     
         while x != to.x || y != to.y {
-            self.draw(&Vec2::new(x as usize, y as usize), color);
+            self.draw(&Vector2::new(x as usize, y as usize), color);
     
             let err2 = err;
     
