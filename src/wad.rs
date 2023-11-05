@@ -134,11 +134,11 @@ pub struct Reader {
 
 impl  Reader {
 
-    pub fn new(wadfile: String) -> Option<Self> {
+    pub fn new(wadfile: &String) -> Option<Self> {
         if let Ok(file_buffer) = fs::read(&wadfile) {
             return {
                 let reader = Reader {
-                    pathfile: wadfile,
+                    pathfile: wadfile.clone(),
                     buffer: file_buffer,
                 };
                 if let Some(header) = reader.header() {

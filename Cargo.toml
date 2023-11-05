@@ -10,6 +10,7 @@ pixels = "0.13"
 winit = "0.28"
 winit_input_helper = "0.14"
 readonly = "0.2.11"
+rust-ini = "0.20.0"
 
 [profile.dev]
 opt-level = 0
