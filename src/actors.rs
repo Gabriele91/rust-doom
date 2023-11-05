@@ -1,11 +1,10 @@
 
 // Engine
 use crate::math::Vec2;
-use crate::map::{Map, Thing};
+use crate::map::Thing;
 use crate::doom::Doom;
 
 // Utils
-use std::option::Option;
 use std::boxed::Box;
 use winit_input_helper::WinitInputHelper;
 
@@ -33,6 +32,7 @@ impl Player {
     }
 }
 
+#[allow(unused_variables)]
 impl Actor for Player {
     fn update<'wad>(&self, engine: &Doom<'wad>) {
 

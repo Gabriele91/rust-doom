@@ -1,7 +1,7 @@
 // Using engine
 use crate::{map::Map, actors::Player};
 use crate::render::{
-    Render2D::RenderMap,
+    render_2d::RenderMap,
     Render
 };
 use crate::window::DoomSurface;

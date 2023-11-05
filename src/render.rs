@@ -7,7 +7,7 @@ pub trait Render {
     fn draw(&self, surface: &mut DoomSurface, actors: &Vec<Box<dyn Actor>>);
 }
 
-pub mod Render2D {
+pub mod render_2d {
     // Use engine
     use crate::map::Map;
     use crate::map::Vertex;

@@ -11,7 +11,7 @@ mod window;
 // Using engine
 use doom::Doom;
 use math::Vec2;
-use render::Render2D::RenderMap;
+use render::render_2d::RenderMap;
 use window::{doom_loop, doom_window, DoomSurface};
 // Using
 use std::rc::Rc;
