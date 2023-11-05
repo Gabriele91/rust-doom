@@ -11,7 +11,7 @@ use crate::wad;
 pub struct Thing {
     pub position: Vec2<i16>,
     pub angle: u16,
-    pub thing_type: u16, 
+    pub type_id: u16, 
     pub flags: u16,
 }
 

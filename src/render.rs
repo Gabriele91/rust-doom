@@ -99,7 +99,7 @@ pub mod render_2d {
                 surface.draw(&vertex.as_vec::<usize>(), &[0xFF, 0xFF, 0xFF, 0xFF]);
             }
             // Draw player 1
-            match actors.iter().find(|&actor| actor.id() == 1) {
+            match actors.iter().find(|&actor| actor.type_id() == 1) {
                 Some(actor) => {
                     let player_position = RenderMap::remap_vertex(
                         &actor.position().as_vec::<i16>(), 

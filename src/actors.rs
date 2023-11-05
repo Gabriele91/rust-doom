@@ -11,23 +11,26 @@ use winit_input_helper::WinitInputHelper;
 pub trait Actor {
     fn update<'wad>(&self, engine: &Doom<'wad>);
     fn control(&self, input: &WinitInputHelper);
-    fn id(&self) -> u16;
+    fn type_id(&self) -> u16;
     fn position(&self) -> &Vec2<i16>;
     fn angle(&self) -> u16;
     fn flags(&self) -> u16;
 }
 
 pub struct Player {
-    pub id: u16,
+    pub type_id: u16,
     pub position: Vec2<i16>,
-    pub angle: u16
+    pub angle: u16,
+    pub flags: u16
 }
+
 impl Player {
     pub fn new<'wad>(thing: &'wad Thing) -> Box<dyn Actor> {
         Box::new(Player {
-            id: thing.thing_type,
+            type_id: thing.type_id,
             position: thing.position,
-            angle: thing.angle
+            angle: thing.angle,
+            flags: thing.flags,
         })
     }
 }
@@ -42,8 +45,8 @@ impl Actor for Player {
 
     }
 
-    fn id(&self) -> u16 {
-        self.id
+    fn type_id(&self) -> u16 {
+        self.type_id
     }
     
     fn position(&self) -> &Vec2<i16>{
@@ -55,6 +58,6 @@ impl Actor for Player {
     }
 
     fn flags(&self) -> u16 {
-        0
+        self.flags
     }
 }

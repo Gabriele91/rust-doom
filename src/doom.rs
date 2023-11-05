@@ -66,7 +66,7 @@ impl<'wad> Doom<'wad> {
     fn create_actors(map: &Box<Map<'wad>>) -> Vec<Box<dyn Actor>> {
         let mut actors = vec![];
         for thing in &map.things {
-            match thing.thing_type {
+            match thing.type_id {
                 1 => actors.push(Player::new(&thing)), 
                 _ => ()
             }
