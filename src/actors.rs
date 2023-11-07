@@ -6,11 +6,12 @@ use crate::doom::Doom;
 
 // Utils
 use std::boxed::Box;
+use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
 pub trait Actor {
-    fn update<'wad>(&self, engine: &Doom<'wad>);
-    fn control(&self, input: &WinitInputHelper);
+    fn update<'wad>(&mut self, engine: &Doom<'wad>);
+    fn control(&mut self, input: &WinitInputHelper);
     fn type_id(&self) -> u16;
     fn position(&self) -> &Vector2<i16>;
     fn angle(&self) -> u16;
@@ -37,12 +38,27 @@ impl Player {
 
 #[allow(unused_variables)]
 impl Actor for Player {
-    fn update<'wad>(&self, engine: &Doom<'wad>) {
+    fn update<'wad>(&mut self, engine: &Doom<'wad>) {
 
     }
 
-    fn control(&self, input: &WinitInputHelper) {
-
+    fn control(&mut self, input: &WinitInputHelper) {
+        if  input.key_held(VirtualKeyCode::W) 
+        && !input.key_held(VirtualKeyCode::S) {
+            self.position += Vector2::new(0, 1);
+        }
+        if !input.key_held(VirtualKeyCode::W) 
+        &&  input.key_held(VirtualKeyCode::S) {
+            self.position -= Vector2::new(0, 1);
+        }        
+        if  input.key_held(VirtualKeyCode::A) 
+        && !input.key_held(VirtualKeyCode::D) {
+            self.position -= Vector2::new(1, 0);
+        }
+        if !input.key_held(VirtualKeyCode::A) 
+        &&  input.key_held(VirtualKeyCode::D) {
+            self.position += Vector2::new(1, 0);
+        }
     }
 
     fn type_id(&self) -> u16 {

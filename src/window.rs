@@ -127,6 +127,13 @@ impl DoomSurface {
         }
     }
 
+    pub fn draw_box(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+        self.draw_line(&from, &Vector2::new(from.x, to.y), &color);
+        self.draw_line(&from, &Vector2::new(to.x, from.y), &color);
+        self.draw_line(&Vector2::new(from.x, to.y), &to, &color);
+        self.draw_line(&Vector2::new(to.x, from.y), &to, &color);
+    }
+
 }
 
 impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
