@@ -31,9 +31,9 @@ impl<'wad> Doom<'wad> {
         Box::new(Doom {
             input: WinitInputHelper::new(),
             surface: surface,
-            actors: Doom::create_actors(&map),
             map: map.clone(),
             bsp: BSP::new(&map),
+            actors: Doom::create_actors(&map),
             render_map: Rc::new(RefCell::new(RenderMap::new(
                 &map,
                 Vector2::new(280, 200),
