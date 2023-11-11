@@ -2,22 +2,16 @@
 use std::sync::Arc;
 // Using, d3d
 use crate::math::Vector2;
-use crate::time::{
-    TimeTrait,
-    Time
-};
+use crate::time::{Time, TimeTrait};
 // Using
+use pixels::{Error, Pixels, SurfaceTexture};
 use readonly;
-use pixels::{
-    Pixels, 
-    SurfaceTexture, 
-    Error
-};
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
+    error::EventLoopError
 };
 
 pub struct DoomSurface {
@@ -256,28 +250,31 @@ pub fn doom_loop<C, U, R, H, T>(
     mut update: U,
     mut render: R,
     mut handler: H,
-) -> !
+) -> Result<(), EventLoopError>
 where
     C: 'static,
     U: FnMut(&mut DoomLoopState<C, Time, Arc<Window>>) + 'static,
     R: FnMut(&mut DoomLoopState<C, Time, Arc<Window>>) + 'static,
-    H: FnMut(&mut DoomLoopState<C, Time, Arc<Window>>, &Event<'_, T>) + 'static,
+    H: FnMut(&mut DoomLoopState<C, Time, Arc<Window>>, &Event<T>) + 'static,
     T: 'static,
 {
     let mut doom_loop_state = DoomLoopState::new(context, updates_per_second, max_frame_time, window);
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
+    event_loop.run(move |event: Event<T>, elwt| {
+        elwt.set_control_flow(ControlFlow::Poll);
 
         // Forward events to existing handlers.
         handler(&mut doom_loop_state, &event);
 
         match event {
-            Event::RedrawRequested(_) => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
                 if !doom_loop_state.next_frame(&mut update, &mut render) {
-                    *control_flow = ControlFlow::Exit;
+                    elwt.exit();
                 }
             }
-            Event::MainEventsCleared => {
+            Event::AboutToWait => {
                 doom_loop_state.window.request_redraw();
             }
             Event::WindowEvent {

@@ -13,7 +13,7 @@ use std::boxed::Box;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
-use winit::{event::Event, event::VirtualKeyCode};
+use winit::{event::Event, keyboard::KeyCode};
 use winit_input_helper::WinitInputHelper;
 
 pub struct Doom<'wad> {
@@ -62,11 +62,11 @@ impl<'wad> Doom<'wad> {
         self.surface.swap().unwrap();
     }
 
-    pub fn control(&mut self, event: &Event<'_, ()>) -> bool {
+    pub fn control(&mut self, event: &Event<()>) -> bool {
         // Input
         if self.input.update(&event) {
             // Close events
-            if self.input.key_pressed(VirtualKeyCode::Escape) || self.input.close_requested() {
+            if self.input.key_pressed(KeyCode::Escape) || self.input.close_requested() {
                 return false;
             } else {
                 for actor in &mut self.actors {

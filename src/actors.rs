@@ -6,7 +6,7 @@ use crate::doom::Doom;
 
 // Utils
 use std::boxed::Box;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
 pub trait Actor {
@@ -43,20 +43,20 @@ impl Actor for Player {
     }
 
     fn control(&mut self, input: &WinitInputHelper) {
-        if  input.key_held(VirtualKeyCode::W) 
-        && !input.key_held(VirtualKeyCode::S) {
+        if  input.key_held(KeyCode::KeyW) 
+        && !input.key_held(KeyCode::KeyS) {
             self.position += Vector2::new(0, 1);
         }
-        if !input.key_held(VirtualKeyCode::W) 
-        &&  input.key_held(VirtualKeyCode::S) {
+        if !input.key_held(KeyCode::KeyW) 
+        &&  input.key_held(KeyCode::KeyS) {
             self.position -= Vector2::new(0, 1);
         }        
-        if  input.key_held(VirtualKeyCode::A) 
-        && !input.key_held(VirtualKeyCode::D) {
+        if  input.key_held(KeyCode::KeyA) 
+        && !input.key_held(KeyCode::KeyD) {
             self.position -= Vector2::new(1, 0);
         }
-        if !input.key_held(VirtualKeyCode::A) 
-        &&  input.key_held(VirtualKeyCode::D) {
+        if !input.key_held(KeyCode::KeyA) 
+        &&  input.key_held(KeyCode::KeyD) {
             self.position += Vector2::new(1, 0);
         }
     }

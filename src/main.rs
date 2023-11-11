@@ -24,7 +24,7 @@ fn main() {
     let configure = Configure::load_from_file(String::from("assets/doom.ini")).unwrap();
     let doom1 = Rc::new(wad::Reader::new(&configure.resource.wad).unwrap());
     let map_e1m1 = Box::new(map::Map::new(&doom1, &String::from("E1M1")).unwrap());
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let window = doom_window(
         String::from("Doom"),
         LogicalSize::<f64>::new(configure.screen.window.width, configure.screen.window.height),
@@ -51,5 +51,5 @@ fn main() {
                 dl.exit();
             }
         },
-    );
+    ).unwrap();
 }
