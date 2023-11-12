@@ -1,6 +1,6 @@
+use std::ops::Range;
 use std::{mem, vec};
 use std::rc::Rc;
-use crate::math;
 use crate::math::{Vector2, Vector4};
 use crate::wad;
 
@@ -96,6 +96,12 @@ pub struct Map<'a> {
     pub sectors : Vec<&'a Seg>,
     pub sub_sectors : Vec<&'a SubSector>,
     pub nodes : Vec<&'a Node>,
+}
+
+impl SubSector {
+    pub fn iter(&self) -> Range<u16> {
+        self.first_seg_id..self.first_seg_id + self.seg_count
+    }
 }
 
 impl<'a> Map<'a> {

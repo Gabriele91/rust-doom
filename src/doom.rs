@@ -30,7 +30,7 @@ pub struct Doom<'wad> {
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
     
-    pub surface: DoomSurface,
+    pub surface: Rc<RefCell<DoomSurface>>,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
 }
 
@@ -44,7 +44,7 @@ impl<'wad> Doom<'wad> {
     pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
         let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
         let map = Box::new(Map::new(&wad, &String::from("E1M1")).unwrap());
-        let surface = DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width(),  configure.screen.surface.height()), &window).unwrap();    
+        let surface = Rc::new(RefCell::new(DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width(),  configure.screen.surface.height()), &window).unwrap()));    
         Box::new(Doom {
             // Resource
             wad,
@@ -78,12 +78,12 @@ impl<'wad> Doom<'wad> {
     }
 
     pub fn draw(&mut self) {
-        self.surface.clear([0, 0, 0, 0]);
+        self.surface.borrow_mut().clear([0, 0, 0, 0]);
         for render_id in 0..self.renders.len() {
             let render = self.renders[render_id].clone();
             render.borrow_mut().draw(self);
         }
-        self.surface.swap().unwrap();
+        self.surface.borrow_mut().swap().unwrap();
     }
 
     pub fn control(&mut self, event: &Event<()>) -> bool {

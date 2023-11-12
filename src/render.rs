@@ -8,10 +8,11 @@ pub trait Render {
 pub mod render_2d {
     use crate::doom::Doom;
     // Use engine
-    use crate::map::{Map, Vertex};
+    use crate::map::{Map, Vertex, NodeBox};
     use crate::math;
     use crate::math::Vector2;
     use crate::shape::Rectangle;
+    use crate::window::DoomSurface;
 
     mod utils {
         use crate::math;
@@ -100,10 +101,12 @@ pub mod render_2d {
 
     impl crate::render::Render for RenderMap<'_> {
         fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+            // Ref
+            let surface = &mut doom.surface.borrow_mut();
             // Draw lines
             for line_def in &self.map.line_defs {
                 // draw point
-                doom.surface.draw_line(
+                surface.draw_line(
                     &self.vertices[line_def.start_vertex_id as usize],
                     &self.vertices[line_def.end_vertex_id as usize],
                     &[0xFF, 0xA5, 0x00, 0xFF],
@@ -112,7 +115,7 @@ pub mod render_2d {
             // Draw screen points
             for vertex in &self.vertices {
                 // draw point
-                doom.surface.draw(&Vector2::<usize>::from(&vertex), &[0xFF, 0xFF, 0xFF, 0xFF]);
+                surface.draw(&Vector2::<usize>::from(&vertex), &[0xFF, 0xFF, 0xFF, 0xFF]);
             }
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
@@ -123,7 +126,7 @@ pub mod render_2d {
                         &self.offset, 
                         &self.size
                     );
-                    doom.surface.draw(&Vector2::<usize>::from(&player_position), &[0x00, 0x00, 0xFF, 0xFF]);
+                    surface.draw(&Vector2::<usize>::from(&player_position), &[0x00, 0x00, 0xFF, 0xFF]);
                 },
                 None => ()
             } 
@@ -149,44 +152,72 @@ pub mod render_2d {
                 offset: offset
             }
         }
+        
+        fn draw_node_box(&self, surface: &mut DoomSurface, node_box: &NodeBox, color: &[u8]){
+            let topleft = utils::remap_vertex(
+                &node_box.zx(), 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            let bottomright = utils::remap_vertex(
+                &node_box.wy(), 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            surface.draw_box(&topleft, &bottomright, color);
+        }
+
+        fn draw_line(&self, surface: &mut DoomSurface, v1: &Vector2<i16>, v2: &Vector2<i16>, color: &[u8]){
+            let remapv1 = utils::remap_vertex(
+                &v1, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            let remapv2 = utils::remap_vertex(
+                &v2, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            surface.draw_line(&remapv1, &remapv2, color);
+        }
     }
 
     impl crate::render::Render for RenderBSP<'_> {
         fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
             // Ref to bsp
             let bsp = &doom.bsp;
+            let surface = doom.surface.clone();
             let render = &self;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
                     bsp.visit_debug(&actor.borrow().position(), 
-                    |_id|{},
+                    |subsector_id|{
+                        let subsector = doom.map.sub_sectors[subsector_id as usize];
+                        for sector_id in subsector.iter() {
+                            let seg = doom.map.sectors[sector_id as usize];
+                            let vertex1 = doom.map.vertices[seg.start_vertex_id as usize];
+                            let vertex2 = doom.map.vertices[seg.end_vertex_id as usize];
+                            render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);
+                        }
+                    },
                     |id| {
                         let node = self.map.nodes[id as usize];
                         let left_box = node.left_box;
                         let right_box = node.right_box;
-                        let top = math::max(left_box.top(), right_box.top());
-                        let bottom = math::min(left_box.bottom(), right_box.bottom());
-                        let left = math::min(left_box.left(), right_box.left());
-                        let right = math::max(left_box.right(), right_box.right());
-                        let topleft = utils::remap_vertex(
-                            &Vector2::new(left, top), 
-                            &render.bounds, 
-                            &render.offset, 
-                            &render.size
-                        );
-                        let bottomright = utils::remap_vertex(
-                            &Vector2::new(right, bottom), 
-                            &render.bounds, 
-                            &render.offset, 
-                            &render.size
-                        );
-                        doom.surface.draw_box(&topleft, &bottomright, &[0xFF, 0x00, 0x00, 0xFF]);
-                    });
+                        render.draw_node_box(&mut surface.borrow_mut(), &left_box, &[0xFF,0x00, 0x00, 0xFF]);
+                        render.draw_node_box(&mut surface.borrow_mut(), &right_box, &[0x00,0xFF, 0x00, 0xFF]);
+                    },
+                    |_id|{ });
                 },
                 None => ()
             } 
         }
+
     }
 
 
