@@ -31,7 +31,6 @@ impl<T : Sized + Copy + NumCast> Vector2<T> {
     pub fn yx(&self) -> Vector2<T> {
         Vector2 { x: self.y, y: self.x }
     }
-
 }
 
 impl<T : Sized + Copy + NumCast + Default> Vector2<T> {
@@ -276,6 +275,197 @@ impl<T: ops::Mul<Output = T> + Sized + Copy + NumCast> ops::MulAssign<Vector3<T>
 impl<T: ops::Sub<Output = T> + Sized + Copy + NumCast> ops::SubAssign<Vector3<T>> for Vector3<T> {
     fn sub_assign(&mut self, right: Vector3<T>) {
         *self = Vector3::new(self.x - right.x, self.y - right.y, self.z - right.z);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Vector4<T> {
+    pub x: T,
+    pub y: T,
+    pub z: T,
+    pub w: T,
+}
+
+impl<T : Sized + Copy + NumCast> Vector4<T> {
+    pub fn new(x: T, y: T, z: T, w: T) -> Self {
+        Vector4 { x, y, z, w }
+    }
+
+    pub fn new_vec2_zw(xy: &Vector2<T>, z: T, w: T) -> Self {
+        Vector4 { x: xy.x, y: xy.y, z: z, w: w }
+    }
+
+    pub fn new_vec3_w(xyz: &Vector3<T>, w: T) -> Self {
+        Vector4 { x: xyz.x, y: xyz.y, z: xyz.z, w: w }
+    }
+
+    pub fn new_x(x: T) -> Self where T: Default {
+        Vector4 { x: x, y: T::default(), z: T::default(), w: T::default() }
+    }
+
+    pub fn new_y(y: T) -> Self where T: Default {
+        Vector4 { x: T::default(), y: y, z: T::default(), w: T::default() }
+    }
+
+    pub fn new_z(z: T) -> Self where T: Default {
+        Vector4 { x: T::default(), y: T::default(), z: z, w: T::default() }
+    }
+
+    pub fn new_w(w: T) -> Self where T: Default {
+        Vector4 { x: T::default(), y: T::default(), z: T::default(), w: w }
+    }
+    
+    pub fn zeros() -> Self where T: Default {
+        Vector4 { x: T::default(), y: T::default(), z: T::default(), w: T::default() }
+    }
+
+    pub fn xy(&self) -> Vector2<T> {
+        Vector2::new( self.x, self.y )
+    }
+
+    pub fn xz(&self) -> Vector2<T> {
+        Vector2::new( self.x, self.z )
+    }
+
+    pub fn yx(&self) -> Vector2<T> {
+        Vector2::new( self.y, self.x )
+    }
+
+    pub fn yz(&self) -> Vector2<T> {
+        Vector2::new( self.y, self.z )
+    }
+
+    pub fn zx(&self) -> Vector2<T> {
+        Vector2::new( self.z, self.x )
+    }
+
+    pub fn zy(&self) -> Vector2<T> {
+        Vector2::new( self.z, self.y )
+    }
+
+    pub fn xyz(&self) -> Vector3<T> {
+        Vector3::new( self.x, self.y, self.z )
+    }
+
+    pub fn xyw(&self) -> Vector3<T> {
+        Vector3::new( self.x, self.y, self.w )
+    }
+
+    pub fn xzw(&self) -> Vector3<T> {
+        Vector3::new( self.x, self.z, self.w )
+    }
+
+    pub fn yxw(&self) -> Vector3<T> {
+        Vector3::new( self.y, self.x, self.w )
+    }
+
+    pub fn yzw(&self) -> Vector3<T> {
+        Vector3::new( self.y, self.z, self.w )
+    }
+
+    pub fn zxy(&self) -> Vector3<T> {
+        Vector3::new( self.z, self.x, self.y )
+    }
+
+    pub fn zyw(&self) -> Vector3<T> {
+        Vector3::new( self.z, self.y, self.w )
+    }
+
+    pub fn wxz(&self) -> Vector3<T> {
+        Vector3::new( self.w, self.x, self.z )
+    }
+
+    pub fn wyz(&self) -> Vector3<T> {
+        Vector3::new( self.w, self.y, self.z )
+    }
+}
+    
+impl<T : Sized + Copy + NumCast + Default> Vector4<T> {
+    pub fn from< U:  Sized + Copy + NumCast + Default>(vec: &Vector4<U>) -> Vector4<T> {
+        Vector4::<T>{ 
+            x: NumCast::from(vec.x).unwrap_or_default(),
+            y: NumCast::from(vec.y).unwrap_or_default(),
+            z: NumCast::from(vec.z).unwrap_or_default(),
+            w: NumCast::from(vec.w).unwrap_or_default(),
+        }
+    }
+}
+
+impl<T: Float> Vector4<T> {
+    pub fn normalize(&self) -> Vector4<T> {
+        let length = self.dot(&self).sqrt();
+        Vector4 { x: self.x / length, y: self.y / length, z: self.z / length, w: self.w / length }
+    }
+
+    pub fn distance(&self, right: &Vector4<T>) -> T {
+        let diff = *self - *right;
+        diff.dot(&diff).sqrt()
+    }
+}
+
+impl<T: ops::Add<Output = T> + ops::Mul<Output = T> + ops::Sub<Output = T> + Sized + Copy + NumCast> Vector4<T> {
+    pub fn dot(&self, right: &Vector4<T>) -> T {
+        return self.x * right.x + self.y * right.y + self.z * right.z + self.w * right.w;
+    }
+}
+
+impl<T: ops::Add<Output = T> + Sized + Copy + NumCast> ops::Add<Vector4<T>> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn add(self, right: Vector4<T>) -> Vector4<T> {
+        Vector4::new(self.x + right.x, self.y + right.y, self.z + right.z, self.w + right.w)
+    }
+}
+
+impl<T: ops::Mul<Output = T> + Sized + Copy + NumCast> ops::Mul<Vector4<T>> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn mul(self, right: Vector4<T>) -> Vector4<T> {
+        Vector4::new(self.x * right.x, self.y * right.y, self.z * right.z, self.w * right.w)
+    }
+}
+
+impl<T: ops::Sub<Output = T> + Sized + Copy + NumCast> ops::Sub<Vector4<T>> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn sub(self, right: Vector4<T>) -> Vector4<T> {
+        Vector4::new(self.x - right.x, self.y - right.y, self.z - right.z, self.w - right.w)
+    }
+}
+
+impl<T: ops::Add<Output = T> + Sized + Copy + NumCast> ops::Add<T> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn add(self, right: T) -> Vector4<T> {
+        Vector4::new(self.x + right, self.y + right, self.z + right, self.w + right)
+    }
+}
+
+impl<T: ops::Mul<Output = T> + Sized + Copy + NumCast> ops::Mul<T> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn mul(self, right: T) -> Vector4<T> {
+        Vector4::new(self.x * right, self.y * right, self.z * right, self.w * right)
+    }
+}
+
+impl<T: ops::Sub<Output = T> + Sized + Copy + NumCast> ops::Sub<T> for Vector4<T> {
+    type Output = Vector4<T>;
+    fn sub(self, right: T) -> Vector4<T> {
+        Vector4::new(self.x - right, self.y - right, self.z - right, self.w - right)
+    }
+}
+
+impl<T: ops::Add<Output = T> + Sized + Copy + NumCast> ops::AddAssign<Vector4<T>> for Vector4<T> {
+    fn add_assign(&mut self, right: Vector4<T>) {
+        *self = Vector4::new(self.x + right.x, self.y + right.y, self.z + right.z, self.w + right.w);
+    }
+}
+
+impl<T: ops::Mul<Output = T> + Sized + Copy + NumCast> ops::MulAssign<Vector4<T>> for Vector4<T> {
+    fn mul_assign(&mut self, right: Vector4<T>) {
+        *self = Vector4::new(self.x * right.x, self.y * right.y, self.z * right.z, self.w * right.w);
+    }
+}
+
+impl<T: ops::Sub<Output = T> + Sized + Copy + NumCast> ops::SubAssign<Vector4<T>> for Vector4<T> {
+    fn sub_assign(&mut self, right: Vector4<T>) {
+        *self = Vector4::new(self.x - right.x, self.y - right.y, self.z - right.z, self.w - right.w);
     }
 }
 

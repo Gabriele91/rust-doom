@@ -22,8 +22,13 @@ pub struct Doom<'wad> {
     pub map: Box<Map<'wad>>,
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
-    pub render_map: Rc<RefCell<RenderMap<'wad>>>,
-    pub render_bsp: Rc<RefCell<RenderBSP<'wad>>>,
+    pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
+}
+
+macro_rules! crea_render {
+    ($t:expr) => {
+        Rc::new(RefCell::new(Box::new($t) as Box<dyn Render + 'wad>))
+    };
 }
 
 impl<'wad> Doom<'wad> {
@@ -34,17 +39,20 @@ impl<'wad> Doom<'wad> {
             map: map.clone(),
             bsp: BSP::new(&map),
             actors: Doom::create_actors(&map),
-            render_map: Rc::new(RefCell::new(RenderMap::new(
-                &map,
-                Vector2::new(280, 200),
-                Vector2::new(20, 20),
-            ))),
-            render_bsp: Rc::new(RefCell::new(RenderBSP::new(
-                &map,
-                Vector2::new(280, 200),
-                Vector2::new(20, 20),
-            ))),
+            renders: vec![
+                crea_render!(RenderMap::new(
+                    &map,
+                    Vector2::new(280, 200),
+                    Vector2::new(20, 20),
+                )),
+                crea_render!(RenderBSP::<'wad>::new(
+                    &map,
+                    Vector2::new(280, 200),
+                    Vector2::new(20, 20),
+                ))
+            ]
         })
+
     }
 
     pub fn update(&mut self) {
@@ -55,10 +63,10 @@ impl<'wad> Doom<'wad> {
 
     pub fn draw(&mut self) {
         self.surface.clear([0, 0, 0, 0]);
-        let render_map = self.render_map.clone();
-        let render_bsp = self.render_bsp.clone();
-        render_map.borrow_mut().draw(self);
-        render_bsp.borrow_mut().draw(self);
+        for render_id in 0..self.renders.len() {
+            let render = self.renders[render_id].clone();
+            render.borrow_mut().draw(self);
+        }
         self.surface.swap().unwrap();
     }
 

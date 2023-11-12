@@ -1,7 +1,7 @@
 use std::{mem, vec};
 use std::rc::Rc;
 use crate::math;
-use crate::math::Vector2;
+use crate::math::{Vector2, Vector4};
 use crate::wad;
 
 #[repr(packed)]
@@ -31,7 +31,7 @@ pub struct LineDef {
 }
 
 // Def a vertex
-pub type Vertex = math::Vector2<i16>;
+pub type Vertex = Vector2<i16>;
 
 #[repr(packed)]
 #[allow(dead_code)]
@@ -55,16 +55,9 @@ pub struct Seg {
     pub offset: u16,    // distance along linedef to start of seg
 }
 
-#[repr(packed)]
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
-#[readonly::make]
-pub struct NodeBox {
-    pub top: i16,
-    pub bottom: i16,
-    pub left: i16,
-    pub right: i16
-}
+
+// Def a NodeBox
+pub type NodeBox = Vector4<i16>;
 
 #[repr(packed)]
 #[allow(dead_code)]

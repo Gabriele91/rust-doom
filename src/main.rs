@@ -4,6 +4,7 @@ mod bsp;
 mod doom;
 mod map;
 mod math;
+mod shape;
 mod render;
 mod time;
 mod wad;
@@ -13,6 +14,7 @@ mod configure;
 use doom::Doom;
 use window::{doom_loop, doom_window, DoomSurface};
 use configure::Configure;
+use shape::Size;
 // Using
 use std::rc::Rc;
 use winit::{
@@ -27,11 +29,11 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     let window = doom_window(
         String::from("Doom"),
-        LogicalSize::<f64>::new(configure.screen.window.width, configure.screen.window.height),
+        LogicalSize::<f64>::new(configure.screen.window.width(), configure.screen.window.height()),
         &event_loop,
     )
     .unwrap();
-    let surface = DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width,  configure.screen.surface.height), &window).unwrap();
+    let surface = DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width(),  configure.screen.surface.height()), &window).unwrap();
     let doom = Doom::new(surface, map_e1m1);
 
     doom_loop(

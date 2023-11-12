@@ -1,7 +1,5 @@
 // Using engine
 use crate::doom::Doom;
-use crate::window::DoomSurface;
-
 // Trait
 pub trait Render {
     fn draw<'wad>(&mut self, doom: &mut Doom<'wad>);
@@ -13,6 +11,7 @@ pub mod render_2d {
     use crate::map::{Map, Vertex};
     use crate::math;
     use crate::math::Vector2;
+    use crate::shape::Rectangle;
 
     mod utils {
         use crate::math;
@@ -164,10 +163,12 @@ pub mod render_2d {
                     |_id|{},
                     |id| {
                         let node = self.map.nodes[id as usize];
-                        let top = math::max(node.left_box.top, node.right_box.top);
-                        let bottom = math::min(node.left_box.bottom, node.right_box.bottom);
-                        let left = math::min(node.left_box.left, node.right_box.left);
-                        let right = math::max(node.left_box.right, node.right_box.right);
+                        let left_box = node.left_box;
+                        let right_box = node.right_box;
+                        let top = math::max(left_box.top(), right_box.top());
+                        let bottom = math::min(left_box.bottom(), right_box.bottom());
+                        let left = math::min(left_box.left(), right_box.left());
+                        let right = math::max(left_box.right(), right_box.right());
                         let topleft = utils::remap_vertex(
                             &Vector2::new(left, top), 
                             &render.bounds, 
