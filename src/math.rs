@@ -343,6 +343,29 @@ impl<T : Sized + Copy + NumCast> Vector4<T> {
         Vector2::new( self.z, self.y )
     }
 
+    pub fn xw(&self) -> Vector2<T> {
+        Vector2::new( self.x, self.w )
+    }
+    
+    pub fn yw(&self) -> Vector2<T> {
+        Vector2::new( self.y, self.w )
+    }
+    
+    pub fn zw(&self) -> Vector2<T> {
+        Vector2::new( self.z, self.w )
+    }
+    pub fn wx(&self) -> Vector2<T> {
+        Vector2::new( self.w, self.x )
+    }
+    
+    pub fn wy(&self) -> Vector2<T> {
+        Vector2::new( self.w, self.y )
+    }
+    
+    pub fn wz(&self) -> Vector2<T> {
+        Vector2::new( self.w, self.z )
+    }
+    
     pub fn xyz(&self) -> Vector3<T> {
         Vector3::new( self.x, self.y, self.z )
     }

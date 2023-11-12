@@ -1,11 +1,15 @@
 // Using engine
 use crate::actors::Actor;
 use crate::bsp::BSP;
+use crate::configure::Configure;
 use crate::math::Vector2;
+use crate::render;
 use crate::render::{
     render_2d::{RenderBSP, RenderMap},
     Render,
 };
+use crate::shape::Size;
+use crate::wad::Reader;
 use crate::window::DoomSurface;
 use crate::{actors::Player, map::Map};
 // Utils
@@ -13,15 +17,20 @@ use std::boxed::Box;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::vec::Vec;
+use winit::dpi::PhysicalSize;
+use winit::window::Window;
 use winit::{event::Event, keyboard::KeyCode};
 use winit_input_helper::WinitInputHelper;
 
 pub struct Doom<'wad> {
+    pub wad: Rc<Reader>,
+
     pub input: WinitInputHelper,
-    pub surface: DoomSurface,
     pub map: Box<Map<'wad>>,
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
+    
+    pub surface: DoomSurface,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
 }
 
@@ -32,25 +41,32 @@ macro_rules! crea_render {
 }
 
 impl<'wad> Doom<'wad> {
-    pub fn new(surface: DoomSurface, map: Box<Map<'wad>>) -> Box<Self> {
+    pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
+        let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
+        let map = Box::new(Map::new(&wad, &String::from("E1M1")).unwrap());
+        let surface = DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width(),  configure.screen.surface.height()), &window).unwrap();    
         Box::new(Doom {
+            // Resource
+            wad,
+            // Logic
             input: WinitInputHelper::new(),
-            surface: surface,
             map: map.clone(),
             bsp: BSP::new(&map),
             actors: Doom::create_actors(&map),
-            renders: vec![
-                crea_render!(RenderMap::new(
-                    &map,
-                    Vector2::new(280, 200),
-                    Vector2::new(20, 20),
-                )),
-                crea_render!(RenderBSP::<'wad>::new(
-                    &map,
-                    Vector2::new(280, 200),
-                    Vector2::new(20, 20),
-                ))
-            ]
+            // Render
+            surface,
+            renders: {
+                let mut renders = vec![];
+                if let Some(debug) = &configure.debug {
+                    if let Some(render_map_2d) = &debug.render_map_2d {
+                        renders.push(crea_render!(RenderMap::new(&map, render_map_2d.zw(), render_map_2d.xy())));
+                    }
+                    if let Some(render_bsp_2d) = &debug.render_bsp_2d {
+                        renders.push(crea_render!(RenderBSP::new(&map, render_bsp_2d.zw(), render_bsp_2d.xy())));
+                    }
+                }
+                renders
+            },
         })
 
     }

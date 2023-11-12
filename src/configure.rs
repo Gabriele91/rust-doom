@@ -16,8 +16,8 @@ pub struct Camera {
 }
 
 pub struct Debug {
-    pub render_map_2d: Option<Vector4<u32>>, 
-    pub render_bsp_2d: Option<Vector4<u32>>, 
+    pub render_map_2d: Option<Vector4<i32>>, 
+    pub render_bsp_2d: Option<Vector4<i32>>, 
 }
 
 #[readonly::make]
@@ -99,8 +99,8 @@ impl Debug {
     pub fn from(props: Option<&Properties>) -> Option<Self> {
         match props {
             Some(props) => Some(Debug { 
-                render_map_2d: Vector4::<u32>::from_optional_str(props.get("render_map_2d")),
-                render_bsp_2d: Vector4::<u32>::from_optional_str(props.get("render_bsp_2d")),
+                render_map_2d: Vector4::<i32>::from_optional_str(props.get("render_map_2d")),
+                render_bsp_2d: Vector4::<i32>::from_optional_str(props.get("render_bsp_2d")),
             }),
             _ => None  
         }
