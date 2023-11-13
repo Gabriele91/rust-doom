@@ -8,6 +8,7 @@ const BSP_MAX_DEPTH: usize = ((u16::MAX / 2).ilog2() + 1) as usize;
 pub struct BSP<'wad> {
     map: Box<Map<'wad>>,
     root_id: u16,
+    stack: Vec<u16>
 }
 
 impl<'wad> BSP<'wad> {
@@ -15,13 +16,43 @@ impl<'wad> BSP<'wad> {
         BSP {
             map: map.clone(),
             root_id: (map.nodes.len() - 1) as u16,
+            stack: {
+                let mut stack = vec![];
+                stack.reserve(BSP_MAX_DEPTH);
+                stack
+            } 
         }
     }
 
-    pub fn visit<'a>(&self, position: &Vector2<i16>, callback: impl FnMut(u16) + 'a) {
+    pub fn visit<'a>(&mut self, position: &Vector2<i16>, callback: impl FnMut(u16) + 'a) {
         self.visit_aux(&position, self.root_id, callback);
     }
 
+    fn visit_aux<'a>(
+        &mut self,
+        position: &Vector2<i16>,
+        node_id: u16,
+        mut callback: impl FnMut(u16) + 'a
+    ) {
+        self.stack.push(node_id);
+        while let Some(node_id) = self.stack.pop() {
+            if node_id & SUBSECTORIDENTIFIER > 0 {
+                callback(node_id & (!SUBSECTORIDENTIFIER));
+                continue;
+            }
+    
+            let node = self.map.nodes[node_id as usize];
+    
+            if self.is_on_left_size(&position, node_id) {
+                self.stack.push(node.right_child_id);
+                self.stack.push(node.left_child_id);
+            } else {
+                self.stack.push(node.left_child_id);
+                self.stack.push(node.right_child_id);
+            }
+        }
+    }
+    
     pub fn visit_debug<'a, 'b, 'c>(
         &self,
         position: &Vector2<i16>,
@@ -32,33 +63,6 @@ impl<'wad> BSP<'wad> {
         self.visit_debug_aux(&position, self.root_id, leaf_node, first_node, second_node);
     }
 
-    fn visit_aux<'a>(
-        &self,
-        position: &Vector2<i16>,
-        node_id: u16,
-        mut callback: impl FnMut(u16) + 'a
-    ) {
-        let mut stack = vec![node_id];
-        stack.reserve(BSP_MAX_DEPTH);
-        
-        while let Some(node_id) = stack.pop() {
-            if node_id & SUBSECTORIDENTIFIER > 0 {
-                callback(node_id & (!SUBSECTORIDENTIFIER));
-                continue;
-            }
-    
-            let node = self.map.nodes[node_id as usize];
-    
-            if self.is_on_left_size(&position, node_id) {
-                stack.push(node.right_child_id);
-                stack.push(node.left_child_id);
-            } else {
-                stack.push(node.left_child_id);
-                stack.push(node.right_child_id);
-            }
-        }
-    }
-    
     fn visit_debug_aux<'a, 'b, 'c>(
         &self,
         position: &Vector2<i16>,
