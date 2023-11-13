@@ -11,7 +11,6 @@ pub mod render_2d {
     use crate::map::{Map, Vertex, NodeBox};
     use crate::math;
     use crate::math::Vector2;
-    use crate::shape::Rectangle;
     use crate::window::DoomSurface;
 
     mod utils {
