@@ -2,6 +2,7 @@
 use std::sync::Arc;
 // Using, d3d
 use crate::math::Vector2;
+use crate::shape::Size;
 use crate::time::{Time, TimeTrait};
 // Using
 use pixels::{Error, Pixels, SurfaceTexture};
@@ -225,14 +226,14 @@ impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
 }
 
 pub fn doom_window<T: 'static>(
-    title: String,
-    size: LogicalSize<f64>,
+    title: &String,
+    size: &Vector2<f64>,
     events: &EventLoop<T>,
 ) -> Option<Arc<Window>> {
     if let Ok(window) = WindowBuilder::new()
         .with_title(title)
-        .with_inner_size(size.clone())
-        .with_min_inner_size(size.clone())
+        .with_inner_size(LogicalSize::<f64>::new(size.width(), size.height()))
+        .with_min_inner_size(LogicalSize::<f64>::new(size.width(), size.height()))
         .build(&events)
     {
         Some(Arc::new(window))
@@ -286,4 +287,28 @@ where
             _ => {}
         }
     })
+}
+
+#[macro_export]
+macro_rules! make_doom_loop {
+    ($event:expr,$window:expr,$context:expr,$frame:expr) => {
+        doom_loop(
+            $event,
+            $window,
+            $context,
+            $frame,
+            1.0 / ($frame as f64),
+            |dl| {
+                dl.context.update();
+            },
+            |dl| {
+                dl.context.draw();
+            },
+            |dl, event| {
+                if !dl.context.control(&event) {
+                    dl.exit();
+                }
+            },
+        )
+    };
 }

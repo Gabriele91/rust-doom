@@ -7,8 +7,10 @@ pub struct Resource {
 }
 
 pub struct Screen {
+    pub title: String,
     pub window: Vector2<f64>, 
     pub surface: Vector2<u32>, 
+    pub frame_rate: u32
 }
 
 pub struct Camera {
@@ -89,8 +91,10 @@ impl Camera {
 impl Screen {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Screen { 
+            title: String::from(props.get("title")?),
             window: Vector2::<f64>::from_str(props.get("window")?)?,
             surface: Vector2::<u32>::from_str(props.get("surface")?)?,
+            frame_rate: props.get("frame_rate")?.parse().ok()?
         })
     }
 }
