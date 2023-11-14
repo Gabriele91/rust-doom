@@ -2,8 +2,7 @@
 // Using
 use core::ops;
 use lazy_static::lazy_static;
-use std::f32::consts::PI;
-use num_traits::{cast::NumCast, Float};
+use num_traits::{cast::NumCast, Float, FloatConst};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector2<T> {
@@ -52,6 +51,10 @@ impl<T: Float> Vector2<T> {
         let diff = *self - *right;
         diff.dot(&diff).sqrt()
     }
+    
+    pub fn magnitude(&self) -> T {
+        (self.x.powi(2) + self.y.powi(2)).sqrt()
+    }
 }
 
 impl<T: ops::Add<Output = T> + ops::Mul<Output = T> + ops::Sub<Output = T> + Sized + Copy + NumCast> Vector2<T> {
@@ -61,7 +64,7 @@ impl<T: ops::Add<Output = T> + ops::Mul<Output = T> + ops::Sub<Output = T> + Siz
 
     pub fn cross(&self, right: &Vector2<T>) -> T {
         self.x * right.y - self.y * right.x
-    }
+    } 
 }
 
 impl<T: ops::Add<Output = T> + Sized + Copy + NumCast> ops::Add<Vector2<T>> for Vector2<T> {
@@ -201,6 +204,10 @@ impl<T: Float> Vector3<T> {
     pub fn distance(&self, right: &Vector3<T>) -> T {
         let diff = *self - *right;
         diff.dot(&diff).sqrt()
+    } 
+    
+    pub fn magnitude(&self) -> T {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
     }
 }
 
@@ -424,6 +431,10 @@ impl<T: Float> Vector4<T> {
         let diff = *self - *right;
         diff.dot(&diff).sqrt()
     }
+    
+    pub fn magnitude(&self) -> T {
+        (self.x.powi(2) + self.y.powi(2) + self.z.powi(2) + self.w.powi(2)).sqrt()
+    }
 }
 
 impl<T: ops::Add<Output = T> + ops::Mul<Output = T> + ops::Sub<Output = T> + Sized + Copy + NumCast> Vector4<T> {
@@ -537,12 +548,34 @@ pub fn degrees<T: Float + NumCast + Default>(radians: T) -> T {
     radians * (T::from(180.0).unwrap() / pi)
 }
 
+pub fn angle<T: Float + NumCast>(v1: &Vector2<T>, v2: &Vector2<T>) -> T {
+    let delta = *v2 - *v1;
+    (delta.y).atan2(delta.x)
+}
+
+pub fn normalize_radians<T: Float + FloatConst + NumCast + Default + ops::AddAssign>(angle: T) -> T {
+    let two_pi = T::PI() * T::from(2.0).unwrap();
+    let mut normalized_angle = angle % two_pi;
+    if normalized_angle < T::default() {
+        normalized_angle += two_pi;
+    }
+    normalized_angle
+}
+
+pub fn normalize_degrees<T: Float + NumCast + Default + ops::AddAssign>(angle: T) -> T {
+    let mut normalized_angle = angle % T::from(360.0).unwrap();
+    if normalized_angle < T::default() {
+        normalized_angle += T::from(360.0).unwrap();
+    }
+    normalized_angle
+}
+
 lazy_static! {
     
     pub static ref SIN: [f32; 360] = {
         let mut sin_values = [0.0; 360];
         for i in 0..360 {
-            sin_values[i] = (i as f32 * PI / 180.0).sin();
+            sin_values[i] = (i as f32 * std::f32::consts::PI / 180.0).sin();
         }
         sin_values
     };
@@ -550,7 +583,7 @@ lazy_static! {
     pub static ref COS: [f32; 360] = {
         let mut cos_values = [0.0; 360];
         for i in 0..360 {
-            cos_values[i] = (i as f32 * PI / 180.0).cos();
+            cos_values[i] = (i as f32 * std::f32::consts::PI / 180.0).cos();
         }
         cos_values
     };

@@ -12,6 +12,7 @@ pub mod render_2d {
     use crate::math;
     use crate::math::Vector2;
     use crate::window::DoomSurface;
+    use crate::camera::Camera;
 
     mod utils {
         use crate::math;
@@ -212,6 +213,72 @@ pub mod render_2d {
                         render.draw_node_box(&mut surface.borrow_mut(), &right_box, &[0x00,0xFF, 0x00, 0xFF]);
                     },
                     |_id|{ });
+                },
+                None => ()
+            } 
+        }
+
+    }
+    // Render 2D bsp
+    
+    #[derive(Clone)]
+    pub struct RenderCamera<'wad> {
+        map: Box<Map<'wad>>,
+        bounds: [Vector2<i16>; 2],
+        size: Vector2<i32>,
+        offset: Vector2<i32>,
+    }
+
+    impl<'wad> RenderCamera<'wad> {
+        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+            let bounds = utils::bound_from_vertices(&map.vertices);
+            RenderCamera {
+                map: map.clone(),
+                bounds: bounds,
+                size: size,
+                offset: offset
+            }
+        }
+
+        fn draw_line(&self, surface: &mut DoomSurface, v1: &Vector2<i16>, v2: &Vector2<i16>, color: &[u8]){
+            let remapv1 = utils::remap_vertex(
+                &v1, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            let remapv2 = utils::remap_vertex(
+                &v2, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            surface.draw_line(&remapv1, &remapv2, color);
+        }
+    }
+
+    impl crate::render::Render for RenderCamera<'_> {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+            // Ref to bsp
+            let bsp = &mut doom.bsp;
+            let surface = doom.surface.clone();
+            let render = &self;
+            let camera = &doom.camera;
+            // Draw player 1
+            match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
+                Some(actor) => {
+                    bsp.visit(&actor.borrow().position(), 
+                    |subsector_id|{
+                        let subsector = doom.map.sub_sectors[subsector_id as usize];
+                        for sector_id in subsector.iter() {
+                            let seg = doom.map.sectors[sector_id as usize];
+                            let vertex1 = doom.map.vertices[seg.start_vertex_id as usize];
+                            let vertex2 = doom.map.vertices[seg.end_vertex_id as usize];
+                            if camera.is_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
+                                render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);                                
+                            }
+                        }
+                    });
                 },
                 None => ()
             } 

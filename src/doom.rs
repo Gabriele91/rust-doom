@@ -2,10 +2,9 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
-use crate::math::Vector2;
-use crate::render;
+use crate::camera::Camera;
 use crate::render::{
-    render_2d::{RenderBSP, RenderMap},
+    render_2d::{RenderBSP, RenderMap, RenderCamera},
     Render,
 };
 use crate::shape::Size;
@@ -32,6 +31,7 @@ pub struct Doom<'wad> {
     
     pub surface: Rc<RefCell<DoomSurface>>,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
+    pub camera: Camera
 }
 
 macro_rules! crea_render {
@@ -64,9 +64,13 @@ impl<'wad> Doom<'wad> {
                     if let Some(render_bsp_2d) = &debug.render_bsp_2d {
                         renders.push(crea_render!(RenderBSP::new(&map, render_bsp_2d.zw(), render_bsp_2d.xy())));
                     }
+                    if let Some(render_camera_2d) = &debug.render_camera_2d {
+                        renders.push(crea_render!(RenderCamera::new(&map, render_camera_2d.zw(), render_camera_2d.xy())));
+                    }
                 }
                 renders
             },
+            camera: Camera::new(configure.camera.fov, configure.screen.surface.width())
         })
 
     }

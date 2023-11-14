@@ -10,6 +10,7 @@ mod shape;
 mod time;
 mod wad;
 mod window;
+mod camera;
 // Using engine
 use configure::Configure;
 use doom::Doom;

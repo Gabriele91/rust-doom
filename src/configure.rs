@@ -14,12 +14,13 @@ pub struct Screen {
 }
 
 pub struct Camera {
-    pub fov: f64,
+    pub fov: f32,
 }
 
 pub struct Debug {
     pub render_map_2d: Option<Vector4<i32>>, 
     pub render_bsp_2d: Option<Vector4<i32>>, 
+    pub render_camera_2d: Option<Vector4<i32>>, 
 }
 
 #[readonly::make]
@@ -105,6 +106,7 @@ impl Debug {
             Some(props) => Some(Debug { 
                 render_map_2d: Vector4::<i32>::from_optional_str(props.get("render_map_2d")),
                 render_bsp_2d: Vector4::<i32>::from_optional_str(props.get("render_bsp_2d")),
+                render_camera_2d: Vector4::<i32>::from_optional_str(props.get("render_camera_2d")),
             }),
             _ => None  
         }

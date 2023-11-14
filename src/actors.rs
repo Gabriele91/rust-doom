@@ -1,6 +1,6 @@
 
 // Engine
-use crate::math::Vector2;
+use crate::math::{Vector2, normalize_degrees};
 use crate::map::Thing;
 use crate::doom::Doom;
 
@@ -58,6 +58,14 @@ impl Actor for Player {
         if !input.key_held(KeyCode::KeyA) 
         &&  input.key_held(KeyCode::KeyD) {
             self.position += Vector2::new(1, 0);
+        }      
+        if  input.key_held(KeyCode::ArrowLeft) 
+        && !input.key_held(KeyCode::ArrowRight) {
+            self.angle = normalize_degrees(self.angle as f32 + 1.0) as u16;
+        }
+        if !input.key_held(KeyCode::ArrowLeft) 
+        &&  input.key_held(KeyCode::ArrowRight) {
+            self.angle = normalize_degrees(self.angle as f32 - 1.0) as u16;
         }
     }
 
