@@ -6,11 +6,13 @@ pub trait Render {
 }
 
 pub mod render_2d {
+    use crate::camera::Camera;
     use crate::doom::Doom;
     // Use engine
     use crate::map::{Map, Vertex, NodeBox};
-    use crate::math;
+    use crate::{math, configure};
     use crate::math::Vector2;
+    use crate::shape::Size;
     use crate::window::DoomSurface;
 
     mod utils {
@@ -226,16 +228,18 @@ pub mod render_2d {
         bounds: [Vector2<i16>; 2],
         size: Vector2<i32>,
         offset: Vector2<i32>,
+        camera: Camera
     }
 
     impl<'wad> RenderCamera<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
             let bounds = utils::bound_from_vertices(&map.vertices);
             RenderCamera {
                 map: map.clone(),
                 bounds: bounds,
                 size: size,
-                offset: offset
+                offset: offset,
+                camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
             }
         }
 
@@ -262,7 +266,6 @@ pub mod render_2d {
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
             let render = &self;
-            let camera = &doom.camera;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
@@ -273,10 +276,12 @@ pub mod render_2d {
                             let seg = render.map.sectors[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
-                            if camera.is_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
+                            if render.camera.is_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
                                 render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);                                
                             }
                         }
+                    },|node_box: &NodeBox| { 
+                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
                     });
                 },
                 None => ()
@@ -288,10 +293,13 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
+    use crate::camera::Camera;
+    use crate::configure;
     use crate::doom::Doom;
     // Use engine
-    use crate::map::Map;
+    use crate::map::{Map, Node, NodeBox};
     use crate::math::Vector2;
+    use crate::shape::Size;
     use crate::window::DoomSurface;
 
     // Render 2D bsp
@@ -300,14 +308,16 @@ pub mod render_3d {
         map: Box<Map<'wad>>,
         size: Vector2<i32>,
         offset: Vector2<i32>,
+        camera: Camera
     }
 
     impl<'wad> RenderSoftware<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
             RenderSoftware {
                 map: map.clone(),
                 size: size,
-                offset: offset
+                offset: offset,
+                camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
             }
         }
 
@@ -327,7 +337,6 @@ pub mod render_3d {
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
             let render = &self;
-            let camera = &doom.camera;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
@@ -338,10 +347,12 @@ pub mod render_3d {
                             let seg = render.map.sectors[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
-                            if let Some((x1,x2, angle)) = camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
+                            if let Some((x1,x2, _angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
                                 render.draw_vline(&mut surface.borrow_mut(), x1,  x2, &[0x00,0x00, 0xFF, 0xFF]);                                
                             }
                         }
+                    },|node_box: &NodeBox| { 
+                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
                     });
                 },
                 None => ()

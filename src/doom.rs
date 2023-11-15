@@ -1,10 +1,10 @@
 // Using engine
 use crate::actors::Actor;
 use crate::bsp::BSP;
-use crate::configure::Configure;
 use crate::camera::Camera;
+use crate::configure::Configure;
 use crate::render::{
-    render_2d::{RenderBSP, RenderMap, RenderCamera},
+    render_2d::{RenderBSP, RenderCamera, RenderMap},
     render_3d::RenderSoftware,
     Render,
 };
@@ -29,10 +29,9 @@ pub struct Doom<'wad> {
     pub map: Box<Map<'wad>>,
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
-    
+
     pub surface: Rc<RefCell<DoomSurface>>,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
-    pub camera: Camera
 }
 
 macro_rules! crea_render {
@@ -45,7 +44,16 @@ impl<'wad> Doom<'wad> {
     pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
         let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
         let map = Box::new(Map::new(&wad, &String::from("E1M1")).unwrap());
-        let surface = Rc::new(RefCell::new(DoomSurface::new(PhysicalSize::<u32>::new(configure.screen.surface.width(),  configure.screen.surface.height()), &window).unwrap()));    
+        let surface = Rc::new(RefCell::new(
+            DoomSurface::new(
+                PhysicalSize::<u32>::new(
+                    configure.screen.surface.width(),
+                    configure.screen.surface.height(),
+                ),
+                &window,
+            )
+            .unwrap(),
+        ));
         Box::new(Doom {
             // Resource
             wad,
@@ -60,23 +68,39 @@ impl<'wad> Doom<'wad> {
                 let mut renders = vec![];
                 if let Some(render) = &configure.render {
                     if let Some(render_map_2d) = &render.render_map_2d {
-                        renders.push(crea_render!(RenderMap::new(&map, render_map_2d.zw(), render_map_2d.xy())));
+                        renders.push(crea_render!(RenderMap::new(
+                            &map,
+                            render_map_2d.zw(),
+                            render_map_2d.xy()
+                        )));
                     }
                     if let Some(render_bsp_2d) = &render.render_bsp_2d {
-                        renders.push(crea_render!(RenderBSP::new(&map, render_bsp_2d.zw(), render_bsp_2d.xy())));
+                        renders.push(crea_render!(RenderBSP::new(
+                            &map,
+                            render_bsp_2d.zw(),
+                            render_bsp_2d.xy()
+                        )));
                     }
                     if let Some(render_camera_2d) = &render.render_camera_2d {
-                        renders.push(crea_render!(RenderCamera::new(&map, render_camera_2d.zw(), render_camera_2d.xy())));
+                        renders.push(crea_render!(RenderCamera::new(
+                            &map,
+                            render_camera_2d.zw(),
+                            render_camera_2d.xy(),
+                            &configure.camera
+                        )));
                     }
                     if let Some(render_software_3d) = &render.render_software_3d {
-                        renders.push(crea_render!(RenderSoftware::new(&map, render_software_3d.zw(), render_software_3d.xy())));
+                        renders.push(crea_render!(RenderSoftware::new(
+                            &map,
+                            render_software_3d.zw(),
+                            render_software_3d.xy(),
+                            &configure.camera
+                        )));
                     }
                 }
                 renders
             },
-            camera: Camera::new(configure.camera.fov, configure.screen.surface.width())
         })
-
     }
 
     pub fn update(&mut self) {

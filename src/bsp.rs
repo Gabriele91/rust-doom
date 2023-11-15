@@ -1,4 +1,4 @@
-use crate::map::Map;
+use crate::map::{Map, NodeBox};
 use crate::math::Vector2;
 
 // 0x8000 in binary 1000000000000000
@@ -24,15 +24,16 @@ impl<'wad> BSP<'wad> {
         }
     }
 
-    pub fn visit<'a>(&mut self, position: &Vector2<i16>, callback: impl FnMut(u16) + 'a) {
-        self.visit_aux(&position, self.root_id, callback);
+    pub fn visit<'a,'b>(&mut self, position: &Vector2<i16>, callback: impl FnMut(u16) + 'a, test_node: impl FnMut(&NodeBox) -> bool + 'b) {
+        self.visit_aux(&position, self.root_id, callback, test_node);
     }
 
-    fn visit_aux<'a>(
+    fn visit_aux<'a,'b>(
         &mut self,
         position: &Vector2<i16>,
         node_id: u16,
-        mut callback: impl FnMut(u16) + 'a
+        mut callback: impl FnMut(u16) + 'a,
+        mut test_node: impl FnMut(&NodeBox) -> bool + 'b
     ) {
         self.stack.push(node_id);
         while let Some(node_id) = self.stack.pop() {
@@ -45,10 +46,16 @@ impl<'wad> BSP<'wad> {
     
             if self.is_on_left_size(&position, node_id) {
                 self.stack.push(node.right_child_id);
-                self.stack.push(node.left_child_id);
+                let left_box = node.left_box;
+                if test_node(&left_box) {
+                    self.stack.push(node.left_child_id);
+                }
             } else {
                 self.stack.push(node.left_child_id);
-                self.stack.push(node.right_child_id);
+                let right_box = node.right_box;
+                if test_node(&right_box) {
+                    self.stack.push(node.right_child_id);
+                }
             }
         }
     }
