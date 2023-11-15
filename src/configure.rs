@@ -17,10 +17,11 @@ pub struct Camera {
     pub fov: f32,
 }
 
-pub struct Debug {
+pub struct Render {
     pub render_map_2d: Option<Vector4<i32>>, 
     pub render_bsp_2d: Option<Vector4<i32>>, 
     pub render_camera_2d: Option<Vector4<i32>>, 
+    pub render_software_3d: Option<Vector4<i32>>, 
 }
 
 #[readonly::make]
@@ -28,7 +29,7 @@ pub struct Configure {
     pub resource: Resource,
     pub screen: Screen,
     pub camera: Camera,
-    pub debug: Option<Debug>,
+    pub render: Option<Render>,
 }
 
 impl Resource {
@@ -100,13 +101,14 @@ impl Screen {
     }
 }
 
-impl Debug {
+impl Render {
     pub fn from(props: Option<&Properties>) -> Option<Self> {
         match props {
-            Some(props) => Some(Debug { 
+            Some(props) => Some(Render { 
                 render_map_2d: Vector4::<i32>::from_optional_str(props.get("render_map_2d")),
                 render_bsp_2d: Vector4::<i32>::from_optional_str(props.get("render_bsp_2d")),
                 render_camera_2d: Vector4::<i32>::from_optional_str(props.get("render_camera_2d")),
+                render_software_3d: Vector4::<i32>::from_optional_str(props.get("render_software_3d")),
             }),
             _ => None  
         }
@@ -120,7 +122,7 @@ impl Configure {
                 resource : Resource::from(ini.section(Some("Resource"))?)?,
                 screen : Screen::from(ini.section(Some("Screen"))?)?,
                 camera : Camera::from(ini.section(Some("Camera"))?)?,
-                debug : Debug::from(ini.section(Some("Debug"))),
+                render : Render::from(ini.section(Some("Render"))),
             });
         }
         None

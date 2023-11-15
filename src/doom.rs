@@ -5,6 +5,7 @@ use crate::configure::Configure;
 use crate::camera::Camera;
 use crate::render::{
     render_2d::{RenderBSP, RenderMap, RenderCamera},
+    render_3d::RenderSoftware,
     Render,
 };
 use crate::shape::Size;
@@ -57,15 +58,18 @@ impl<'wad> Doom<'wad> {
             surface,
             renders: {
                 let mut renders = vec![];
-                if let Some(debug) = &configure.debug {
-                    if let Some(render_map_2d) = &debug.render_map_2d {
+                if let Some(render) = &configure.render {
+                    if let Some(render_map_2d) = &render.render_map_2d {
                         renders.push(crea_render!(RenderMap::new(&map, render_map_2d.zw(), render_map_2d.xy())));
                     }
-                    if let Some(render_bsp_2d) = &debug.render_bsp_2d {
+                    if let Some(render_bsp_2d) = &render.render_bsp_2d {
                         renders.push(crea_render!(RenderBSP::new(&map, render_bsp_2d.zw(), render_bsp_2d.xy())));
                     }
-                    if let Some(render_camera_2d) = &debug.render_camera_2d {
+                    if let Some(render_camera_2d) = &render.render_camera_2d {
                         renders.push(crea_render!(RenderCamera::new(&map, render_camera_2d.zw(), render_camera_2d.xy())));
+                    }
+                    if let Some(render_software_3d) = &render.render_software_3d {
+                        renders.push(crea_render!(RenderSoftware::new(&map, render_software_3d.zw(), render_software_3d.xy())));
                     }
                 }
                 renders
