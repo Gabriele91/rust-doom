@@ -305,7 +305,7 @@ pub mod render_3d {
     use crate::shape::Size;
     use crate::window::DoomSurface;
 
-    // Render 2D bsp
+    // Render 3D bsp
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
         map: Rc<Map<'wad>>,

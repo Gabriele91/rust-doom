@@ -26,8 +26,21 @@ pub struct LineDef {
     pub flag: u16, 
     pub line_type: u16, 
     pub sector_tag :u16,
-    pub right_sidedef :u16,
-    pub left_sidedef :u16,
+    pub right_sidedef_id :u16,
+    pub left_sidedef_id :u16,
+}
+
+// Def of a side
+#[repr(packed)]
+#[allow(dead_code)]
+#[derive(Debug)]
+#[readonly::make]
+pub struct SideDef {
+    pub offset: Vector2<i16>,
+    pub upper_texture: [u8; 8],
+    pub lower_texture: [u8; 8],
+    pub middle_texture: [u8; 8],
+    pub sector_id: i16 
 }
 
 // Def a vertex
@@ -89,13 +102,44 @@ pub enum MAPLUMPSINDEX {
 
 #[derive(Clone)]
 pub struct Map<'a> {
-        reader : Rc<wad::Reader>,
-    pub things : Vec<&'a Thing>,
-    pub line_defs : Vec<&'a LineDef>,
-    pub vertices : Vec<&'a Vertex>,
-    pub sectors : Vec<&'a Seg>,
-    pub sub_sectors : Vec<&'a SubSector>,
-    pub nodes : Vec<&'a Node>,
+        reader: Rc<wad::Reader>,
+    pub things: Vec<&'a Thing>,
+    pub line_defs: Vec<&'a LineDef>,
+    pub side_defs: Vec<&'a SideDef>,
+    pub vertices: Vec<&'a Vertex>,
+    pub sectors: Vec<&'a Seg>,
+    pub sub_sectors: Vec<&'a SubSector>,
+    pub nodes: Vec<&'a Node>,
+}
+
+impl LineDef {
+    pub fn right_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
+        if self.right_sidedef_id == 0xFFFF {
+            return Some(map.side_defs[self.right_sidedef_id as usize]);
+        }
+        return None;
+    }
+    
+    pub fn left_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
+        if self.left_sidedef_id != 0xFFFF {
+            return Some(map.side_defs[self.left_sidedef_id as usize]);
+        }
+        return None;
+    }
+
+    pub fn start_vertex<'a>(&'a self, map: &Map<'a>) -> &'a Vertex {
+        return &map.vertices[self.start_vertex_id as usize];
+    }
+
+    pub fn end_vertex<'a>(&'a self, map: &Map<'a>) -> &'a Vertex {
+        return &map.vertices[self.end_vertex_id as usize];
+    }
+}
+
+impl SideDef {
+    pub fn sector<'a>(&'a self, map: &Map<'a>) -> &'a Seg {
+        return &map.sectors[self.sector_id as usize];
+    }
 }
 
 impl SubSector {
@@ -112,6 +156,7 @@ impl<'a> Map<'a> {
                     reader: reader.clone(),
                     things: vec![], 
                     line_defs: vec![], 
+                    side_defs: vec![], 
                     vertices: vec![], 
                     sectors: vec![], 
                     sub_sectors: vec![],  
@@ -119,6 +164,7 @@ impl<'a> Map<'a> {
                 };
                 map.things = map.extract::<Thing>(&directories[map_dir_id + MAPLUMPSINDEX::THINGS as usize]);
                 map.line_defs = map.extract::<LineDef>(&directories[map_dir_id + MAPLUMPSINDEX::LINEDEFS as usize]);
+                map.side_defs = map.extract::<SideDef>(&directories[map_dir_id + MAPLUMPSINDEX::SIDEDDEFS as usize]);
                 map.vertices = map.extract::<Vertex>(&directories[map_dir_id + MAPLUMPSINDEX::VERTEXES as usize]);
                 map.sectors = map.extract::<Seg>(&directories[map_dir_id + MAPLUMPSINDEX::SEGS as usize]);
                 map.sub_sectors = map.extract::<SubSector>(&directories[map_dir_id + MAPLUMPSINDEX::SSECTORS as usize]);
