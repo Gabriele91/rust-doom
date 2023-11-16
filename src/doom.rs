@@ -26,7 +26,7 @@ pub struct Doom<'wad> {
     pub wad: Rc<Reader>,
 
     pub input: WinitInputHelper,
-    pub map: Box<Map<'wad>>,
+    pub map: Rc<Map<'wad>>,
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
 
@@ -43,7 +43,7 @@ macro_rules! crea_render {
 impl<'wad> Doom<'wad> {
     pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
         let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
-        let map = Box::new(Map::new(&wad, &String::from("E1M1")).unwrap());
+        let map = Rc::new(Map::new(&wad, &String::from("E1M1")).unwrap());
         let surface = Rc::new(RefCell::new(
             DoomSurface::new(
                 PhysicalSize::<u32>::new(
@@ -67,33 +67,33 @@ impl<'wad> Doom<'wad> {
             renders: {
                 let mut renders = vec![];
                 if let Some(render) = &configure.render {
-                    if let Some(render_map_2d) = &render.render_map_2d {
+                    if let Some(map_2d) = &render.map_2d {
                         renders.push(crea_render!(RenderMap::new(
                             &map,
-                            render_map_2d.zw(),
-                            render_map_2d.xy()
+                            map_2d.zw(),
+                            map_2d.xy()
                         )));
                     }
-                    if let Some(render_bsp_2d) = &render.render_bsp_2d {
+                    if let Some(bsp_2d) = &render.bsp_2d {
                         renders.push(crea_render!(RenderBSP::new(
                             &map,
-                            render_bsp_2d.zw(),
-                            render_bsp_2d.xy()
+                            bsp_2d.zw(),
+                            bsp_2d.xy()
                         )));
                     }
-                    if let Some(render_camera_2d) = &render.render_camera_2d {
+                    if let Some(camera_2d) = &render.camera_2d {
                         renders.push(crea_render!(RenderCamera::new(
                             &map,
-                            render_camera_2d.zw(),
-                            render_camera_2d.xy(),
+                            camera_2d.zw(),
+                            camera_2d.xy(),
                             &configure.camera
                         )));
                     }
-                    if let Some(render_software_3d) = &render.render_software_3d {
+                    if let Some(software_3d) = &render.software_3d {
                         renders.push(crea_render!(RenderSoftware::new(
                             &map,
-                            render_software_3d.zw(),
-                            render_software_3d.xy(),
+                            software_3d.zw(),
+                            software_3d.xy(),
                             &configure.camera
                         )));
                     }
@@ -133,7 +133,7 @@ impl<'wad> Doom<'wad> {
         return true;
     }
 
-    fn create_actors(map: &Box<Map<'wad>>) -> Vec<Rc<RefCell<Box<dyn Actor>>>> {
+    fn create_actors(map: &Rc<Map<'wad>>) -> Vec<Rc<RefCell<Box<dyn Actor>>>> {
         let mut actors = vec![];
         for thing in &map.things {
             match thing.type_id {

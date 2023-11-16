@@ -18,10 +18,10 @@ pub struct Camera {
 }
 
 pub struct Render {
-    pub render_map_2d: Option<Vector4<i32>>, 
-    pub render_bsp_2d: Option<Vector4<i32>>, 
-    pub render_camera_2d: Option<Vector4<i32>>, 
-    pub render_software_3d: Option<Vector4<i32>>, 
+    pub map_2d: Option<Vector4<i32>>, 
+    pub bsp_2d: Option<Vector4<i32>>, 
+    pub camera_2d: Option<Vector4<i32>>, 
+    pub software_3d: Option<Vector4<i32>>, 
 }
 
 #[readonly::make]
@@ -105,10 +105,10 @@ impl Render {
     pub fn from(props: Option<&Properties>) -> Option<Self> {
         match props {
             Some(props) => Some(Render { 
-                render_map_2d: Vector4::<i32>::from_optional_str(props.get("render_map_2d")),
-                render_bsp_2d: Vector4::<i32>::from_optional_str(props.get("render_bsp_2d")),
-                render_camera_2d: Vector4::<i32>::from_optional_str(props.get("render_camera_2d")),
-                render_software_3d: Vector4::<i32>::from_optional_str(props.get("render_software_3d")),
+                map_2d: Vector4::<i32>::from_optional_str(props.get("map_2d")),
+                bsp_2d: Vector4::<i32>::from_optional_str(props.get("bsp_2d")),
+                camera_2d: Vector4::<i32>::from_optional_str(props.get("camera_2d")),
+                software_3d: Vector4::<i32>::from_optional_str(props.get("software_3d")),
             }),
             _ => None  
         }

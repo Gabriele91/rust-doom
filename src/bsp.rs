@@ -1,3 +1,5 @@
+use std::rc::Rc;
+// Engine
 use crate::map::{Map, NodeBox};
 use crate::math::Vector2;
 
@@ -6,13 +8,13 @@ const SUBSECTORIDENTIFIER: u16 = 0x8000;
 const BSP_MAX_DEPTH: usize = ((u16::MAX / 2).ilog2() + 1) as usize;
 
 pub struct BSP<'wad> {
-    map: Box<Map<'wad>>,
+    map: Rc<Map<'wad>>,
     root_id: u16,
     stack: Vec<u16>
 }
 
 impl<'wad> BSP<'wad> {
-    pub fn new(map: &Box<Map<'wad>>) -> Self {
+    pub fn new(map: &Rc<Map<'wad>>) -> Self {
         BSP {
             map: map.clone(),
             root_id: (map.nodes.len() - 1) as u16,

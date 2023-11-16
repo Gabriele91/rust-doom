@@ -6,14 +6,15 @@ pub trait Render {
 }
 
 pub mod render_2d {
-    use crate::camera::Camera;
-    use crate::doom::Doom;
+    use std::rc::Rc;
     // Use engine
     use crate::map::{Map, Vertex, NodeBox};
     use crate::{math, configure};
     use crate::math::Vector2;
     use crate::shape::Size;
     use crate::window::DoomSurface;
+    use crate::camera::Camera;
+    use crate::doom::Doom;
 
     mod utils {
         use crate::math;
@@ -52,7 +53,7 @@ pub mod render_2d {
     // Render 2D map
     #[derive(Clone)]
     pub struct RenderMap<'wad> {
-        map: Box<Map<'wad>>,
+        map: Rc<Map<'wad>>,
         bounds: [Vector2<i16>; 2],
         size: Vector2<i32>,
         offset: Vector2<i32>,
@@ -60,7 +61,7 @@ pub mod render_2d {
     }
 
     impl<'wad> RenderMap<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
             let bounds = utils::bound_from_vertices(&map.vertices);
             let vertices = RenderMap::remap_all_vertices(&map.vertices, &bounds, &size, &offset);
             RenderMap {
@@ -137,14 +138,14 @@ pub mod render_2d {
     // Render 2D bsp
     #[derive(Clone)]
     pub struct RenderBSP<'wad> {
-        map: Box<Map<'wad>>,
+        map: Rc<Map<'wad>>,
         bounds: [Vector2<i16>; 2],
         size: Vector2<i32>,
         offset: Vector2<i32>,
     }
 
     impl<'wad> RenderBSP<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
             let bounds = utils::bound_from_vertices(&map.vertices);
             RenderBSP {
                 map: map.clone(),
@@ -224,7 +225,7 @@ pub mod render_2d {
     
     #[derive(Clone)]
     pub struct RenderCamera<'wad> {
-        map: Box<Map<'wad>>,
+        map: Rc<Map<'wad>>,
         bounds: [Vector2<i16>; 2],
         size: Vector2<i32>,
         offset: Vector2<i32>,
@@ -232,7 +233,7 @@ pub mod render_2d {
     }
 
     impl<'wad> RenderCamera<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
+        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
             let bounds = utils::bound_from_vertices(&map.vertices);
             RenderCamera {
                 map: map.clone(),
@@ -293,11 +294,13 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
+    use std::rc::Rc;
+
+    // Use engine
     use crate::camera::Camera;
     use crate::configure;
     use crate::doom::Doom;
-    // Use engine
-    use crate::map::{Map, Node, NodeBox};
+    use crate::map::{Map, NodeBox};
     use crate::math::Vector2;
     use crate::shape::Size;
     use crate::window::DoomSurface;
@@ -305,14 +308,14 @@ pub mod render_3d {
     // Render 2D bsp
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
-        map: Box<Map<'wad>>,
+        map: Rc<Map<'wad>>,
         size: Vector2<i32>,
         offset: Vector2<i32>,
         camera: Camera
     }
 
     impl<'wad> RenderSoftware<'wad> {
-        pub fn new(map: &Box<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
+        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
             RenderSoftware {
                 map: map.clone(),
                 size: size,
