@@ -26,21 +26,22 @@ impl<'wad> BSP<'wad> {
         }
     }
 
-    pub fn visit<'a,'b>(&mut self, position: &Vector2<i16>, callback: impl FnMut(u16) + 'a, test_node: impl FnMut(&NodeBox) -> bool + 'b) {
-        self.visit_aux(&position, self.root_id, callback, test_node);
+    pub fn visit<'a,'b, T>(&mut self, position: &Vector2<i16>, context: &mut T, callback: impl FnMut(u16, &mut T) + 'a, test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b) {
+        self.visit_aux(&position, context, self.root_id, callback, test_node);
     }
 
-    fn visit_aux<'a,'b>(
+    fn visit_aux<'a,'b, T>(
         &mut self,
         position: &Vector2<i16>,
+        context: &mut T,
         node_id: u16,
-        mut callback: impl FnMut(u16) + 'a,
-        mut test_node: impl FnMut(&NodeBox) -> bool + 'b
+        mut callback: impl FnMut(u16, &mut T) + 'a,
+        mut test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b
     ) {
         self.stack.push(node_id);
         while let Some(node_id) = self.stack.pop() {
             if node_id & SUBSECTORIDENTIFIER > 0 {
-                callback(node_id & (!SUBSECTORIDENTIFIER));
+                callback(node_id & (!SUBSECTORIDENTIFIER), context);
                 continue;
             }
     
@@ -49,13 +50,13 @@ impl<'wad> BSP<'wad> {
             if self.is_on_left_size(&position, node_id) {
                 self.stack.push(node.right_child_id);
                 let left_box = node.left_box;
-                if test_node(&left_box) {
+                if test_node(&left_box, context) {
                     self.stack.push(node.left_child_id);
                 }
             } else {
                 self.stack.push(node.left_child_id);
                 let right_box = node.right_box;
-                if test_node(&right_box) {
+                if test_node(&right_box, context) {
                     self.stack.push(node.right_child_id);
                 }
             }

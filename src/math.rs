@@ -558,6 +558,7 @@ pub fn normalize_radians<T: Float + FloatConst + NumCast + Default + ops::AddAss
     let mut normalized_angle = angle % two_pi;
     if normalized_angle < T::default() {
         normalized_angle += two_pi;
+        normalized_angle = normalized_angle % two_pi;
     }
     normalized_angle
 }
@@ -566,6 +567,7 @@ pub fn normalize_degrees<T: Float + NumCast + Default + ops::AddAssign>(angle: T
     let mut normalized_angle = angle % T::from(360.0).unwrap();
     if normalized_angle < T::default() {
         normalized_angle += T::from(360.0).unwrap();
+        normalized_angle = normalized_angle % T::from(360.0).unwrap();
     }
     normalized_angle
 }

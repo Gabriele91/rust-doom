@@ -266,12 +266,14 @@ pub mod render_2d {
             // Ref to bsp
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
-            let render = &self;
+            let render = self;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
-                    bsp.visit(&actor.borrow().position(), 
-                    |subsector_id|{
+                    bsp.visit(
+                     &actor.borrow().position(),
+                     render, 
+                     |subsector_id, render|{
                         let subsector = render.map.sub_sectors[subsector_id as usize];
                         for sector_id in subsector.iter() {
                             let seg = render.map.sectors[sector_id as usize];
@@ -281,7 +283,7 @@ pub mod render_2d {
                                 render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);                                
                             }
                         }
-                    },|node_box: &NodeBox| { 
+                    },|node_box, render| { 
                         render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
                     });
                 },
@@ -294,16 +296,22 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
+    use std::collections::HashSet;
     use std::rc::Rc;
-
     // Use engine
     use crate::camera::Camera;
     use crate::configure;
     use crate::doom::Doom;
-    use crate::map::{Map, NodeBox};
+    use crate::map::Map;
     use crate::math::Vector2;
     use crate::shape::Size;
     use crate::window::DoomSurface;
+
+    #[derive(Clone, Copy)]
+    struct SolidSegmentRange  {
+        start: u32,
+        end: u32
+    }
 
     // Render 3D bsp
     #[derive(Clone)]
@@ -311,7 +319,8 @@ pub mod render_3d {
         map: Rc<Map<'wad>>,
         size: Vector2<i32>,
         offset: Vector2<i32>,
-        camera: Camera
+        camera: Camera,
+        screen_range: HashSet<u32>,
     }
 
     impl<'wad> RenderSoftware<'wad> {
@@ -321,10 +330,27 @@ pub mod render_3d {
                 size: size,
                 offset: offset,
                 camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
+                screen_range: (0..size.width() as u32).collect::<HashSet<u32>>(),
+            }
+        }
+        
+        fn reset(&mut self) {
+            self.screen_range = (0..self.size.width() as u32).collect::<HashSet<u32>>();
+        }
+
+        fn draw_solid_wall(&self, surface: &mut DoomSurface, color: &[u8], start: u32, end: u32) {
+            for x in start..=end {
+                self.draw_vline(surface, x, &color);
             }
         }
 
-        fn draw_vline(&self, surface: &mut DoomSurface, x1: u32, x2: u32, color: &[u8]){
+        fn draw_vline(&self, surface: &mut DoomSurface, x: u32, color: &[u8]){
+            let x_start = Vector2::new(x as i32, self.offset.y);
+            let x_end = Vector2::new(x as i32, self.size.y + self.offset.y);
+            surface.draw_line(&x_start, &x_end, color);
+        }
+
+        fn draw_vlines(&self, surface: &mut DoomSurface, x1: u32, x2: u32, color: &[u8]){
             let x1_start = Vector2::new(x1 as i32, self.offset.y);
             let x1_end = Vector2::new(x1 as i32, self.size.y + self.offset.y);
             surface.draw_line(&x1_start, &x1_end, color);
@@ -332,30 +358,68 @@ pub mod render_3d {
             let x2_end = Vector2::new(x2 as i32, self.size.y + self.offset.y);
             surface.draw_line(&x2_start, &x2_end, color);
         }
+
+        fn draw_clip_solid_walls(&mut self, surface: &mut DoomSurface, color: &[u8], x_start: u32, x_end: u32) {
+            let curr_wall: HashSet<u32> = (x_start..x_end).collect();
+            let intersection: HashSet<u32> = self.screen_range.intersection(&curr_wall).cloned().collect();
+            if !intersection.is_empty() {
+                if intersection.len() == curr_wall.len() {
+                    self.draw_solid_wall(surface, &color, x_start, x_end - 1);
+                } else {
+                    let mut arr: Vec<u32> = intersection.iter().cloned().collect();
+                    arr.sort_unstable();
+                    let (first, items) = arr.split_at(1);
+                    let mut x = first[0];
+                    for (x1, x2) in items.windows(2).map(|w| (w[0], w[1])) {
+                        if x2 - x1 > 1 {
+                            self.draw_solid_wall(surface, &color, x, x1);
+                            x = x2;
+                        }
+                    }
+                    self.draw_solid_wall(surface, &color, x, *items.last().unwrap());
+                }
+                self.screen_range.retain(|x| !intersection.contains(x));
+            }
+        }
     }
 
     impl crate::render::Render for RenderSoftware<'_> {
         fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+            // Clear
+            self.reset();
             // Ref to bsp
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
-            let render = &self;
+            let render = self;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
-                    bsp.visit(&actor.borrow().position(), 
-                    |subsector_id|{
+                    bsp.visit(
+                        &actor.borrow().position(), 
+                        render,
+                        |subsector_id, render|{
                         let subsector = render.map.sub_sectors[subsector_id as usize];
+                        let mut count = 0;
                         for sector_id in subsector.iter() {
                             let seg = render.map.sectors[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
+                            let colors: [[u8; 4]; 7] = [
+                                [0xFF,0x00, 0x00, 0xFF],
+                                [0x00,0xFF, 0x00, 0xFF],
+                                [0x00,0x00, 0xFF, 0xFF],
+                                [0xFF,0xFF, 0x00, 0xFF],
+                                [0xFF,0x00, 0xFF, 0xFF],
+                                [0x00,0xFF, 0xFF, 0xFF],
+                                [0xFF,0xFF, 0xFF, 0xFF]
+                            ];
                             if let Some((x1,x2, _angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
-                                render.draw_vline(&mut surface.borrow_mut(), x1,  x2, &[0x00,0x00, 0xFF, 0xFF]);                                
+                                render.draw_clip_solid_walls(&mut surface.borrow_mut(), &colors[count], x1,  x2);                      
                             }
+                            count += 1; if count >= 7 { count = 0; } 
                         }
-                    },|node_box: &NodeBox| { 
-                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
+                    },|node_box, render| { 
+                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box) 
                     });
                 },
                 None => ()

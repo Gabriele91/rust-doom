@@ -175,7 +175,7 @@ impl Camera {
                 return None;
             }
             // Clip other side
-            segment_angle1 = self.fov;
+            segment_angle1 = self.half_fov;
         }
 
         // Span 2
@@ -185,7 +185,7 @@ impl Camera {
                 return None;
             }
             // Clip other side
-            segment_angle2 = self.fov;
+            segment_angle2 = -self.half_fov;
         }
 
         // End

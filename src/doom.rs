@@ -67,6 +67,14 @@ impl<'wad> Doom<'wad> {
             renders: {
                 let mut renders = vec![];
                 if let Some(render) = &configure.render {
+                    if let Some(software_3d) = &render.software_3d {
+                        renders.push(crea_render!(RenderSoftware::new(
+                            &map,
+                            software_3d.zw(),
+                            software_3d.xy(),
+                            &configure.camera
+                        )));
+                    }
                     if let Some(map_2d) = &render.map_2d {
                         renders.push(crea_render!(RenderMap::new(
                             &map,
@@ -86,14 +94,6 @@ impl<'wad> Doom<'wad> {
                             &map,
                             camera_2d.zw(),
                             camera_2d.xy(),
-                            &configure.camera
-                        )));
-                    }
-                    if let Some(software_3d) = &render.software_3d {
-                        renders.push(crea_render!(RenderSoftware::new(
-                            &map,
-                            software_3d.zw(),
-                            software_3d.xy(),
                             &configure.camera
                         )));
                     }
