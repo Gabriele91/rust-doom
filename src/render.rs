@@ -168,7 +168,7 @@ pub mod render_2d {
                 &self.offset, 
                 &self.size
             );
-            surface.draw_line_lb(&topleft, &bottomright, color);
+            surface.draw_box_lb(&topleft, &bottomright, color);
         }
 
         fn draw_line(&self, surface: &mut DoomSurface, v1: &Vector2<i16>, v2: &Vector2<i16>, color: &[u8]){
@@ -267,7 +267,6 @@ pub mod render_2d {
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
             let render = self;
-            let  mut count = 0;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
@@ -282,11 +281,6 @@ pub mod render_2d {
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
                             if render.camera.is_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
                                 render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);
-                                if count % 10 == 0 {
-                                    surface.borrow_mut().swap().unwrap();
-                                }
-                                count += 1;
-                                //sleep(Duration::from_millis(1));                    
                             }
                         }
                         let position = Vector2::<f32>::from(&actor.borrow().position());
@@ -320,12 +314,9 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
-    use std::collections::HashSet;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::rc::Rc;
-    use std::thread::sleep;
-    use std::time;
     use crate::actors::Actor;
     // Use engine
     use crate::camera::Camera;
@@ -354,7 +345,6 @@ pub mod render_3d {
         size: Vector2<i32>,
         offset: Vector2<i32>,
         camera: Camera,
-        //screen_range: HashSet<u32>,
         screen_range: Vec<bool>,
         upper_clip: Vec<i32>,
         lower_clip: Vec<i32>,
@@ -368,21 +358,12 @@ pub mod render_3d {
                 size: size,
                 offset: offset,
                 camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
-                //screen_range: RenderSoftware::init_hash(size.width() as u32),
                 screen_range: vec![false; size.width() as usize],
                 upper_clip: vec![-1; size.width() as usize],
                 lower_clip: vec![size.height(); size.width() as usize],
             }
         }
         
-        fn init_hash(width: u32) -> HashSet<u32> {
-            let mut range = HashSet::new();
-            for i in 0..width {
-                range.insert(i);
-            }
-            range
-        }
-
         fn reset(&mut self) {
             self.screen_range.fill(true);
             //self.screen_range = RenderSoftware::init_hash(self.size.width() as u32);
