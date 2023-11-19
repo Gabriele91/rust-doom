@@ -32,7 +32,7 @@ impl Player {
         Box::new(Player {
             type_id: thing.type_id,
             position: thing.position,
-            height: 20,
+            height: 45,
             angle: thing.angle,
             flags: thing.flags,
         })

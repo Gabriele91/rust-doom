@@ -366,18 +366,27 @@ pub mod render_3d {
         
         fn reset(&mut self) {
             self.screen_range.fill(true);
-            //self.screen_range = RenderSoftware::init_hash(self.size.width() as u32);
             self.upper_clip.fill(-1);
             self.lower_clip.fill(self.size.height());
         }
 
-        fn name_to_color(array: &[u8; 8], light_level: &f32) -> [u8; 4] {
+        fn name_to_color(array: &[u8; 8], mut light_level: &f32) -> [u8; 4] {
+            light_level = math::clamp(light_level, &0.1, &1.0);
+            if  *array == consts::VOID_TEXTURE {
+                return 
+                [
+                    (255.0 * light_level) as u8,
+                    (255.0 * light_level) as u8,
+                    (255.0 * light_level) as u8,
+                    0xFF
+                ]
+            }
             let mut hasher = DefaultHasher::new();
             array.hash(&mut hasher);
             let hash = hasher.finish();
-            let r = (hash >> 16 & 0xFF) as f32;
-            let g = (hash >> 8 & 0xFF) as f32;
-            let b = (hash >> 0 & 0xFF) as f32;
+            let r = math::clamp((hash >> 16 & 0xFF) as f32, 32.0, 255.0);
+            let g = math::clamp((hash >>  8 & 0xFF) as f32, 32.0, 255.0);
+            let b = math::clamp((hash >>  0 & 0xFF) as f32, 32.0, 255.0);
             return 
             [
                 (r * light_level) as u8,
@@ -480,29 +489,26 @@ pub mod render_3d {
                     for x in start..end {
                         let draw_wall_y1 = wall_y1 as i32 - 1;
                         let draw_wall_y2 = wall_y2 as i32;
-                        /* 
                         if b_draw_ceiling {
                             let ceiling_wall_y1 = self.upper_clip[x as usize] + 1;
-                            let ceiling_wall_y2 = math::min(draw_wall_y1 - 1, self.upper_clip[x as usize] - 1);
+                            let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize] - 1);
                             surface.draw_line_lt(
                                 &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
                                 &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
                                 &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
                             );
                         }
-                        */
                         if b_draw_wall {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize] + 1);
-                            let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize] - 1);
+                            let middle_wall_y2 = math::min(draw_wall_y2 + 1, self.lower_clip[x as usize] - 1);
                             surface.draw_line_lt(
                                 &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
                                 &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
                                 &RenderSoftware::name_to_color(&wall_texture, &light_level)
                             );
                         }
-                        /*
                         if b_draw_floor {
-                            let floor_wall_y1 = math::max(draw_wall_y2 + 1, self.lower_clip[x as usize] - 1);
+                            let floor_wall_y1 = math::max(draw_wall_y2 + 1, self.upper_clip[x as usize] + 1);
                             let floor_wall_y2 = self.lower_clip[x as usize] - 1;
                             surface.draw_line_lt(
                                 &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
@@ -510,7 +516,6 @@ pub mod render_3d {
                                 &RenderSoftware::name_to_color(&floor_texture, &light_level)
                             );
                         }
-                        */
                         // Next step
                         wall_y1 += wall_y1_step;
                         wall_y2 += wall_y2_step;
