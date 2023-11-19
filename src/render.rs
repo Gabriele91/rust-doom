@@ -108,7 +108,7 @@ pub mod render_2d {
             // Draw lines
             for line_def in &self.map.line_defs {
                 // draw point
-                surface.draw_line(
+                surface.draw_line_lb(
                     &self.vertices[line_def.start_vertex_id as usize],
                     &self.vertices[line_def.end_vertex_id as usize],
                     &[0xFF, 0xA5, 0x00, 0xFF],
@@ -117,7 +117,7 @@ pub mod render_2d {
             // Draw screen points
             for vertex in &self.vertices {
                 // draw point
-                surface.draw(&Vector2::<usize>::from(&vertex), &[0xFF, 0xFF, 0xFF, 0xFF]);
+                surface.draw_lb(&Vector2::<usize>::from(&vertex), &[0xFF, 0xFF, 0xFF, 0xFF]);
             }
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
@@ -128,7 +128,7 @@ pub mod render_2d {
                         &self.offset, 
                         &self.size
                     );
-                    surface.draw(&Vector2::<usize>::from(&player_position), &[0x00, 0x00, 0xFF, 0xFF]);
+                    surface.draw_lb(&Vector2::<usize>::from(&player_position), &[0x00, 0x00, 0xFF, 0xFF]);
                 },
                 None => ()
             } 
@@ -168,7 +168,7 @@ pub mod render_2d {
                 &self.offset, 
                 &self.size
             );
-            surface.draw_box(&topleft, &bottomright, color);
+            surface.draw_line_lb(&topleft, &bottomright, color);
         }
 
         fn draw_line(&self, surface: &mut DoomSurface, v1: &Vector2<i16>, v2: &Vector2<i16>, color: &[u8]){
@@ -184,7 +184,7 @@ pub mod render_2d {
                 &self.offset, 
                 &self.size
             );
-            surface.draw_line(&remapv1, &remapv2, color);
+            surface.draw_line_lb(&remapv1, &remapv2, color);
         }
     }
 
@@ -201,7 +201,7 @@ pub mod render_2d {
                     |subsector_id|{
                         let subsector = doom.map.sub_sectors[subsector_id as usize];
                         for sector_id in subsector.iter() {
-                            let seg = doom.map.sectors[sector_id as usize];
+                            let seg = doom.map.segs[sector_id as usize];
                             let vertex1 = doom.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = doom.map.vertices[seg.end_vertex_id as usize];
                             render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);
@@ -257,7 +257,7 @@ pub mod render_2d {
                 &self.offset, 
                 &self.size
             );
-            surface.draw_line(&remapv1, &remapv2, color);
+            surface.draw_line_lb(&remapv1, &remapv2, color);
         }
     }
 
@@ -267,22 +267,46 @@ pub mod render_2d {
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
             let render = self;
+            let  mut count = 0;
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
                     bsp.visit(
                      &actor.borrow().position(),
                      render, 
-                     |subsector_id, render|{
+                     |subsector_id, render| -> bool {
                         let subsector = render.map.sub_sectors[subsector_id as usize];
                         for sector_id in subsector.iter() {
-                            let seg = render.map.sectors[sector_id as usize];
+                            let seg = render.map.segs[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
                             if render.camera.is_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
-                                render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);                                
+                                render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0x00,0x00, 0xFF, 0xFF]);
+                                if count % 10 == 0 {
+                                    surface.borrow_mut().swap().unwrap();
+                                }
+                                count += 1;
+                                //sleep(Duration::from_millis(1));                    
                             }
                         }
+                        let position = Vector2::<f32>::from(&actor.borrow().position());
+                        let angle_left = math::radians(actor.borrow().angle() as f32 + render.camera.half_fov);
+                        let angle_right = math::radians(actor.borrow().angle() as f32 - render.camera.half_fov);
+                        let left = position + Vector2::new(angle_left.cos(), angle_left.sin()) * (render.size.height() as f32) * 8.0;
+                        let right = position + Vector2::new(angle_right.cos(), angle_right.sin()) * (render.size.height() as f32) * 8.0;
+                        render.draw_line(
+                            &mut surface.borrow_mut(),
+                            &Vector2::<i16>::from(&position), 
+                            &Vector2::<i16>::from(&left), 
+                            &[0xFF,0xFF, 0xFF, 0xFF]
+                        );
+                        render.draw_line(
+                            &mut surface.borrow_mut(),
+                            &Vector2::<i16>::from(&position), 
+                            &Vector2::<i16>::from(&right), 
+                            &[0xFF,0xFF, 0xFF, 0xFF]
+                        );
+                        return true;
                     },|node_box, render| { 
                         render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
                     });
@@ -297,20 +321,30 @@ pub mod render_2d {
 
 pub mod render_3d {
     use std::collections::HashSet;
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
     use std::rc::Rc;
+    use std::thread::sleep;
+    use std::time;
+    use crate::actors::Actor;
     // Use engine
     use crate::camera::Camera;
-    use crate::configure;
+    use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::Map;
+    use crate::map::{Map, Seg};
     use crate::math::Vector2;
     use crate::shape::Size;
     use crate::window::DoomSurface;
 
-    #[derive(Clone, Copy)]
-    struct SolidSegmentRange  {
-        start: u32,
-        end: u32
+    mod consts {
+        pub const VOID_TEXTURE : [u8; 8] = ['-' as u8,0,0,0, 0,0,0,0];
+        pub const MAX_SCALE : f32  = 64.0;
+        pub const MIN_SCALE : f32 = 0.00390625;
+    }
+
+    enum WallType<'a> {
+        SolidWall(&'a Seg),
+        PortalWall(&'a Seg)
     }
 
     // Render 3D bsp
@@ -320,8 +354,12 @@ pub mod render_3d {
         size: Vector2<i32>,
         offset: Vector2<i32>,
         camera: Camera,
-        screen_range: HashSet<u32>,
+        //screen_range: HashSet<u32>,
+        screen_range: Vec<bool>,
+        upper_clip: Vec<i32>,
+        lower_clip: Vec<i32>,
     }
+
 
     impl<'wad> RenderSoftware<'wad> {
         pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
@@ -330,56 +368,208 @@ pub mod render_3d {
                 size: size,
                 offset: offset,
                 camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
-                screen_range: (0..size.width() as u32).collect::<HashSet<u32>>(),
+                //screen_range: RenderSoftware::init_hash(size.width() as u32),
+                screen_range: vec![false; size.width() as usize],
+                upper_clip: vec![-1; size.width() as usize],
+                lower_clip: vec![size.height(); size.width() as usize],
             }
         }
         
-        fn reset(&mut self) {
-            self.screen_range = (0..self.size.width() as u32).collect::<HashSet<u32>>();
+        fn init_hash(width: u32) -> HashSet<u32> {
+            let mut range = HashSet::new();
+            for i in 0..width {
+                range.insert(i);
+            }
+            range
         }
 
-        fn draw_solid_wall(&self, surface: &mut DoomSurface, color: &[u8], start: u32, end: u32) {
-            for x in start..=end {
-                self.draw_vline(surface, x, &color);
+        fn reset(&mut self) {
+            self.screen_range.fill(true);
+            //self.screen_range = RenderSoftware::init_hash(self.size.width() as u32);
+            self.upper_clip.fill(-1);
+            self.lower_clip.fill(self.size.height());
+        }
+
+        fn name_to_color(array: &[u8; 8], light_level: &f32) -> [u8; 4] {
+            let mut hasher = DefaultHasher::new();
+            array.hash(&mut hasher);
+            let hash = hasher.finish();
+            let r = (hash >> 16 & 0xFF) as f32;
+            let g = (hash >> 8 & 0xFF) as f32;
+            let b = (hash >> 0 & 0xFF) as f32;
+            return 
+            [
+                (r * light_level) as u8,
+                (g * light_level) as u8,
+                (b * light_level) as u8,
+                0xFF
+            ]
+        }
+
+        fn classify_segment(&self, seg: &'wad Seg, start: u32, end: u32) -> Option<WallType<'wad>> {
+            if start == end {
+                return None;
+            }
+
+            // Right is mandatory
+            let right_sector = seg.right_sector(&self.map)?;
+            
+            // Left only if it is a portal
+            if let Some(left_sector) = seg.left_sector(&self.map) {
+                
+                // Wall with window
+                if right_sector.floor_height != left_sector.floor_height 
+                || right_sector.ceiling_height != left_sector.ceiling_height {
+                   return Some(WallType::PortalWall(&seg));
+                }
+
+                // Reject empty lines used for triggers and special events.
+                // identical floor and ceiling on both sides, identical
+                // light levels on both sides, and no middle texture.
+                if right_sector.ceiling_texture == left_sector.ceiling_texture 
+                && right_sector.floor_texture == left_sector.floor_texture
+                && right_sector.light_level != left_sector.light_level
+                && seg.line_defs(&self.map).right_side(&self.map)?.middle_texture == consts::VOID_TEXTURE {
+                    return None;
+                }
+
+                return Some(WallType::PortalWall(&seg));
+
+            } else {
+                return Some(WallType::SolidWall(&seg));
+            }
+        }
+
+        fn draw_wall(&self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
+            match wtype {
+                WallType::SolidWall(ref_seg) => {
+                    // Alias
+                    let seg = *ref_seg;
+                    let line = seg.line_defs(&self.map);
+                    let side = line.right_side(&self.map).unwrap();
+                    let sector = seg.right_sector(&self.map).unwrap();
+                    let angle = actor.angle() as f32;
+                    let position = Vector2::<f32>::from( actor.position() );
+                    let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
+                    let half_height = self.size.height() as f32 / 2.0;
+                    // Texture
+                    let wall_texture = side.middle_texture;
+                    let floor_texture = sector.floor_texture;
+                    let ceiling_texture = sector.ceiling_texture;
+                    let light_level = math::clamp( sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    // Height of wall w/ rispect to player
+                    let wall_floor = sector.floor_height - *actor.height();
+                    let wall_ceiling = sector.ceiling_height - *actor.height();
+                    // What to draw
+                    let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
+                    let b_draw_ceiling = wall_ceiling > 0;
+                    let b_draw_floor = wall_floor < 0;
+                    // Calculate the scaling factors of the left and right edges of the wall range
+                    let wall_normal_angle = seg.float_degrees_angle() + 90.0;
+                    let offset_angle = wall_normal_angle - wall_angle;
+                    let hypotenuse = position.distance(&start_vertex);
+                    let wall_distance = hypotenuse * math::radians(offset_angle).cos();
+                    // Compute scale
+                    let wall_scale_1 = math::clamp(
+                        self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
+                        consts::MIN_SCALE, 
+                        consts::MAX_SCALE
+                    );
+                    let wall_scale_step = {
+                        if start < end {
+                            let wall_scale_2 = math::clamp(
+                                self.camera.scale_from_global_angle(end, wall_normal_angle, wall_distance, angle), 
+                                consts::MIN_SCALE, 
+                                consts::MAX_SCALE
+                            );
+                            (wall_scale_2 - wall_scale_1) / (end - start) as f32
+                        } else {
+                            0.0
+                        }
+                    };
+                    // Determine where on the screen the wall is drawn
+                    // Top wall
+                    let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale_1;
+                    let wall_y1_step = -wall_scale_step * wall_ceiling as f32;
+                    // Bottom wall
+                    let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
+                    let wall_y2_step = -wall_scale_step * wall_floor as f32;
+
+                    // Draw
+                    for x in start..end {
+                        let draw_wall_y1 = wall_y1 as i32 - 1;
+                        let draw_wall_y2 = wall_y2 as i32;
+                        /* 
+                        if b_draw_ceiling {
+                            let ceiling_wall_y1 = self.upper_clip[x as usize] + 1;
+                            let ceiling_wall_y2 = math::min(draw_wall_y1 - 1, self.upper_clip[x as usize] - 1);
+                            surface.draw_line_lt(
+                                &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
+                                &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
+                                &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                            );
+                        }
+                        */
+                        if b_draw_wall {
+                            let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize] + 1);
+                            let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize] - 1);
+                            surface.draw_line_lt(
+                                &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
+                                &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
+                                &RenderSoftware::name_to_color(&wall_texture, &light_level)
+                            );
+                        }
+                        /*
+                        if b_draw_floor {
+                            let floor_wall_y1 = math::max(draw_wall_y2 + 1, self.lower_clip[x as usize] - 1);
+                            let floor_wall_y2 = self.lower_clip[x as usize] - 1;
+                            surface.draw_line_lt(
+                                &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
+                                &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
+                                &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                            );
+                        }
+                        */
+                        // Next step
+                        wall_y1 += wall_y1_step;
+                        wall_y2 += wall_y2_step;
+                    }
+                },
+                _ => {}
             }
         }
 
         fn draw_vline(&self, surface: &mut DoomSurface, x: u32, color: &[u8]){
             let x_start = Vector2::new(x as i32, self.offset.y);
             let x_end = Vector2::new(x as i32, self.size.y + self.offset.y);
-            surface.draw_line(&x_start, &x_end, color);
+            surface.draw_line_lt(&x_start, &x_end, color);
         }
 
-        fn draw_vlines(&self, surface: &mut DoomSurface, x1: u32, x2: u32, color: &[u8]){
-            let x1_start = Vector2::new(x1 as i32, self.offset.y);
-            let x1_end = Vector2::new(x1 as i32, self.size.y + self.offset.y);
-            surface.draw_line(&x1_start, &x1_end, color);
-            let x2_start = Vector2::new(x2 as i32, self.offset.y);
-            let x2_end = Vector2::new(x2 as i32, self.size.y + self.offset.y);
-            surface.draw_line(&x2_start, &x2_end, color);
-        }
+        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType, mut wall_x_start: u32, mut wall_x_end: u32, raw_angle: f32) -> bool {
+            let mut xs = wall_x_start;
+            let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
-        fn draw_clip_solid_walls(&mut self, surface: &mut DoomSurface, color: &[u8], x_start: u32, x_end: u32) {
-            let curr_wall: HashSet<u32> = (x_start..x_end).collect();
-            let intersection: HashSet<u32> = self.screen_range.intersection(&curr_wall).cloned().collect();
-            if !intersection.is_empty() {
-                if intersection.len() == curr_wall.len() {
-                    self.draw_solid_wall(surface, &color, x_start, x_end - 1);
-                } else {
-                    let mut arr: Vec<u32> = intersection.iter().cloned().collect();
-                    arr.sort_unstable();
-                    let (first, items) = arr.split_at(1);
-                    let mut x = first[0];
-                    for (x1, x2) in items.windows(2).map(|w| (w[0], w[1])) {
-                        if x2 - x1 > 1 {
-                            self.draw_solid_wall(surface, &color, x, x1);
-                            x = x2;
-                        }
-                    }
-                    self.draw_solid_wall(surface, &color, x, *items.last().unwrap());
+            while xs < end {         
+                if !self.screen_range[xs as usize] {
+                    xs += 1;
+                    continue;
                 }
-                self.screen_range.retain(|x| !intersection.contains(x));
+                let mut xe = xs;
+                while  xe < end && self.screen_range[xe as usize] {
+                    if let WallType::SolidWall(_) = wtype {
+                        self.screen_range[xe as usize] = false;
+                    }
+                    xe += 1;
+                    continue;
+                }
+                if (xe - xs) > 0 {
+                    self.draw_wall(actor, surface, wtype, xs, xe, raw_angle);
+                    xs = xe + 1;
+                } else {
+                    break;
+                }
             }
+            return self.screen_range.contains(&true);
         }
     }
 
@@ -399,27 +589,19 @@ pub mod render_3d {
                         render,
                         |subsector_id, render|{
                         let subsector = render.map.sub_sectors[subsector_id as usize];
-                        let mut count = 0;
                         for sector_id in subsector.iter() {
-                            let seg = render.map.sectors[sector_id as usize];
+                            let seg = render.map.segs[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
-                            let colors: [[u8; 4]; 7] = [
-                                [0xFF,0x00, 0x00, 0xFF],
-                                [0x00,0xFF, 0x00, 0xFF],
-                                [0x00,0x00, 0xFF, 0xFF],
-                                [0xFF,0xFF, 0x00, 0xFF],
-                                [0xFF,0x00, 0xFF, 0xFF],
-                                [0x00,0xFF, 0xFF, 0xFF],
-                                [0xFF,0xFF, 0xFF, 0xFF]
-                            ];
-                            if let Some((x1,x2, _angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
-                                render.draw_clip_solid_walls(&mut surface.borrow_mut(), &colors[count], x1,  x2);                      
-                            }
-                            count += 1; if count >= 7 { count = 0; } 
+                            if let Some((x1,x2, raw_angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
+                               if let Some(wtype) = render.classify_segment(&seg, x1, x2){
+                                    render.draw_clip_walls(&actor.borrow(),&mut surface.borrow_mut(), &wtype, x1,  x2, raw_angle);
+                               }
+                            }                               
                         }
+                        return  true;
                     },|node_box, render| { 
-                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box) 
+                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
                     });
                 },
                 None => ()

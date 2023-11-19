@@ -26,7 +26,7 @@ impl<'wad> BSP<'wad> {
         }
     }
 
-    pub fn visit<'a,'b, T>(&mut self, position: &Vector2<i16>, context: &mut T, callback: impl FnMut(u16, &mut T) + 'a, test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b) {
+    pub fn visit<'a,'b, T>(&mut self, position: &Vector2<i16>, context: &mut T, callback: impl FnMut(u16, &mut T) -> bool + 'a, test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b) {
         self.visit_aux(&position, context, self.root_id, callback, test_node);
     }
 
@@ -35,14 +35,16 @@ impl<'wad> BSP<'wad> {
         position: &Vector2<i16>,
         context: &mut T,
         node_id: u16,
-        mut callback: impl FnMut(u16, &mut T) + 'a,
+        mut callback: impl FnMut(u16, &mut T) -> bool + 'a,
         mut test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b
     ) {
         self.stack.push(node_id);
         while let Some(node_id) = self.stack.pop() {
             if node_id & SUBSECTORIDENTIFIER > 0 {
-                callback(node_id & (!SUBSECTORIDENTIFIER), context);
-                continue;
+                if callback(node_id & (!SUBSECTORIDENTIFIER), context) {
+                    continue;
+                }
+                return;
             }
     
             let node = self.map.nodes[node_id as usize];

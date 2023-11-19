@@ -14,6 +14,7 @@ pub trait Actor {
     fn control(&mut self, input: &WinitInputHelper);
     fn type_id(&self) -> u16;
     fn position(&self) -> &Vector2<i16>;
+    fn height(&self) -> &i16;
     fn angle(&self) -> u16;
     fn flags(&self) -> u16;
 }
@@ -21,6 +22,7 @@ pub trait Actor {
 pub struct Player {
     pub type_id: u16,
     pub position: Vector2<i16>,
+    pub height: i16,
     pub angle: u16,
     pub flags: u16
 }
@@ -30,6 +32,7 @@ impl Player {
         Box::new(Player {
             type_id: thing.type_id,
             position: thing.position,
+            height: 20,
             angle: thing.angle,
             flags: thing.flags,
         })
@@ -76,7 +79,11 @@ impl Actor for Player {
     fn position(&self) -> &Vector2<i16>{
         &self.position
     }
-    
+
+    fn height(&self) -> &i16 {
+        &self.height
+    }
+
     fn angle(&self) -> u16 {
         self.angle
     }

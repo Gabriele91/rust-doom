@@ -1,16 +1,18 @@
 use num_traits::NumCast;
 use crate::actors::Actor;
 use crate::map::NodeBox;
-use crate::math::{angle, degrees, normalize_degrees, radians, Vector2};
+use crate::math::{angle, degrees, normalize_degrees, radians, Vector2, self};
 use crate::shape::Rectangle;
 
 #[derive(Clone)]
+#[readonly::make]
 pub struct Camera {
     pub fov: f32,
-    half_fov: f32,
-    half_width: u32,
-    screen_dist: f32,
-    tan_angle_360: Vec<f32>,
+    pub half_fov: f32,
+    pub half_width: u32,
+    pub screen_dist: f32,
+    // Cache tables
+    x_to_angle : Vec<f32>
 }
 
 impl Camera {
@@ -22,26 +24,36 @@ impl Camera {
             fov,
             half_fov,
             half_width,
-            screen_dist,
-            tan_angle_360: {
-                let mut atan_angle_360 = vec![];
-                atan_angle_360.reserve(360);
-                for angle in 0..360 {
-                    atan_angle_360.push(radians(angle as f32).tan());
+            screen_dist, 
+            x_to_angle : {
+                let mut table = vec![];
+                table.reserve(width as usize + 1);
+                for i in 0..=width as i32 {
+                    table.push(math::degrees(((half_width as i32 - i) as f32 / screen_dist).atan()))
                 }
-                atan_angle_360
-            },
+                table
+            }
         }
     }
 
-    pub fn angle_to_x(&self, angle: u16) -> u32 {
-        if angle > 0 {
-            (self.screen_dist - (self.tan_angle_360[angle as usize] * self.half_width as f32))
-                as u32
+    pub fn angle_to_x(&self, angle: f32) -> u32 {
+        if angle > 0.0 {
+            (self.screen_dist - (radians(angle).tan() * self.half_width as f32))  as u32
         } else {
-            ((-self.tan_angle_360[angle as usize] * self.half_width as f32) + self.screen_dist)
-                as u32
+            ((-radians(angle).tan() * self.half_width as f32) + self.screen_dist) as u32
         }
+    }
+
+    pub fn x_to_angle(&self, x: u32) -> f32 {
+        self.x_to_angle[x as usize]
+    }    
+    
+    pub fn scale_from_global_angle(&self, x: u32, wall_normal_angle1: f32, wall_distance: f32, actor_angle: f32) -> f32 {
+        let x_angle = self.x_to_angle(x);
+        let num = self.screen_dist * (math::radians(wall_normal_angle1 - x_angle - actor_angle)).cos();
+        let den = wall_distance * math::radians(x_angle).cos();
+        let scale = num / den;
+        return scale;
     }
 
     pub fn is_box_in_frustum(&self, actor: &dyn Actor, bbox: &NodeBox) -> bool {
@@ -154,20 +166,19 @@ impl Camera {
         let fv2 = Vector2::<f32>::from(&vertex2);
         let fpos = Vector2::<f32>::from(&actor.position());
         let fangle = actor.angle() as f32;
-        let mut segment_angle1 = normalize_degrees(degrees(angle(&fpos, &fv1)));
-        let mut segment_angle2 = normalize_degrees(degrees(angle(&fpos, &fv2)));
+        let mut segment_angle1 = degrees(angle(&fpos, &fv1));
+        let mut segment_angle2 = degrees(angle(&fpos, &fv2));
         // Save raw angle
         let raw_angle1 = segment_angle1;
         // Span 0
-        let span0 = normalize_degrees(segment_angle1 - segment_angle2);
+        let span0: f32 = normalize_degrees(segment_angle1 - segment_angle2);
         // Test 1
         if span0 >= 180.0 {
             return None;
         }
-
+        // Compute the angles
         segment_angle1 -= fangle;
         segment_angle2 -= fangle;
-
         // Span 1
         let span1 = normalize_degrees(segment_angle1 + self.half_fov);
         if span1 > self.fov {
@@ -190,8 +201,8 @@ impl Camera {
 
         // End
         return Some((
-            self.angle_to_x(normalize_degrees(segment_angle1) as u16),
-            self.angle_to_x(normalize_degrees(segment_angle2) as u16),
+            self.angle_to_x(segment_angle1),
+            self.angle_to_x(segment_angle2),
             raw_angle1,
         ));
     }

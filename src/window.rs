@@ -73,7 +73,56 @@ impl DoomSurface {
         self.pixels.render()
     }
 
-    pub fn draw(&mut self, position: &Vector2<usize>, color: &[u8]) {
+    
+    pub fn draw_lt(&mut self, position: &Vector2<usize>, color: &[u8]) {
+        let size = self.pixels.texture().size();
+        let channels = self.pixels.texture().format().block_size(None).unwrap() as usize;
+        if position.x >= size.width as usize || position.y >= size.height as usize {
+            return;
+        }
+        let frame = self.pixels.frame_mut();
+        let row_size = (size.width as usize) * channels; // 4 colors per byte
+        let offset: usize = position.y * row_size + position.x * channels;
+        let mut ptr = frame.as_mut_ptr();
+        unsafe {
+            ptr = ptr.add(offset);
+            for channel in color.iter() {
+                (*ptr) = *channel;
+                ptr = ptr.add(1);
+            }
+        }
+    }
+
+    pub fn draw_line_lt(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+        let dx = (to.x - from.x).abs();
+        let dy = (to.y - from.y).abs();
+    
+        let step_x = if to.x > from.x { 1 } else { -1 };
+        let step_y = if to.y > from.y { 1 } else { -1 };
+    
+        let mut x = from.x;
+        let mut y = from.y;
+    
+        let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
+    
+        while x != to.x || y != to.y {
+            self.draw_lt(&Vector2::new(x as usize, y as usize), color);
+    
+            let err2 = err;
+    
+            if err2 > -dx {
+                err -= dy;
+                x += step_x;
+            }
+    
+            if err2 < dy {
+                err += dx;
+                y += step_y;
+            }
+        }
+    }
+
+    pub fn draw_lb(&mut self, position: &Vector2<usize>, color: &[u8]) {
         let size = self.pixels.texture().size();
         let channels = self.pixels.texture().format().block_size(None).unwrap() as usize;
         if position.x >= size.width as usize || position.y >= size.height as usize {
@@ -93,7 +142,7 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_line(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+    pub fn draw_line_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
         let dx = (to.x - from.x).abs();
         let dy = (to.y - from.y).abs();
     
@@ -106,7 +155,7 @@ impl DoomSurface {
         let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
     
         while x != to.x || y != to.y {
-            self.draw(&Vector2::new(x as usize, y as usize), color);
+            self.draw_lb(&Vector2::new(x as usize, y as usize), color);
     
             let err2 = err;
     
@@ -122,11 +171,11 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_box(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
-        self.draw_line(&from, &Vector2::new(from.x, to.y), &color);
-        self.draw_line(&from, &Vector2::new(to.x, from.y), &color);
-        self.draw_line(&Vector2::new(from.x, to.y), &to, &color);
-        self.draw_line(&Vector2::new(to.x, from.y), &to, &color);
+    pub fn draw_box_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+        self.draw_line_lb(&from, &Vector2::new(from.x, to.y), &color);
+        self.draw_line_lb(&from, &Vector2::new(to.x, from.y), &color);
+        self.draw_line_lb(&Vector2::new(from.x, to.y), &to, &color);
+        self.draw_line_lb(&Vector2::new(to.x, from.y), &to, &color);
     }
 
 }
