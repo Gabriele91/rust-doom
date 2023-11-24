@@ -346,8 +346,8 @@ pub mod render_3d {
         offset: Vector2<i32>,
         camera: Camera,
         screen_range: Vec<bool>,
-        upper_clip: Vec<i32>,
-        lower_clip: Vec<i32>,
+        upper_clip: Box<Vec<i32>>,
+        lower_clip: Box<Vec<i32>>,
     }
 
 
@@ -359,14 +359,14 @@ pub mod render_3d {
                 offset: offset,
                 camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
                 screen_range: vec![false; size.width() as usize],
-                upper_clip: vec![-1; size.width() as usize],
-                lower_clip: vec![size.height(); size.width() as usize],
+                upper_clip: Box::new(vec![0; size.width() as usize]),
+                lower_clip: Box::new(vec![size.height(); size.width() as usize]),
             }
         }
         
         fn reset(&mut self) {
             self.screen_range.fill(true);
-            self.upper_clip.fill(-1);
+            self.upper_clip.fill(0);
             self.lower_clip.fill(self.size.height());
         }
 
@@ -418,11 +418,12 @@ pub mod render_3d {
                 // light levels on both sides, and no middle texture.
                 if right_sector.ceiling_texture == left_sector.ceiling_texture 
                 && right_sector.floor_texture == left_sector.floor_texture
-                && right_sector.light_level != left_sector.light_level
+                && right_sector.light_level == left_sector.light_level
                 && seg.line_defs(&self.map).right_side(&self.map)?.middle_texture == consts::VOID_TEXTURE {
                     return None;
                 }
 
+                // Borders with different light levels and/or textures
                 return Some(WallType::PortalWall(&seg));
 
             } else {
@@ -430,7 +431,7 @@ pub mod render_3d {
             }
         }
 
-        fn draw_wall(&self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
+        fn draw_wall(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
             match wtype {
                 WallType::SolidWall(ref_seg) => {
                     // Alias
@@ -454,6 +455,10 @@ pub mod render_3d {
                     let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
                     let b_draw_ceiling = wall_ceiling > 0;
                     let b_draw_floor = wall_floor < 0;
+                    // Test
+                    if !b_draw_wall && !b_draw_ceiling && !b_draw_floor {
+                        return;
+                    }
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
                     let offset_angle = wall_normal_angle - wall_angle;
@@ -487,51 +492,239 @@ pub mod render_3d {
 
                     // Draw
                     for x in start..end {
-                        let draw_wall_y1 = wall_y1 as i32 - 1;
+                        let draw_wall_y1 = wall_y1 as i32;
                         let draw_wall_y2 = wall_y2 as i32;
                         if b_draw_ceiling {
-                            let ceiling_wall_y1 = self.upper_clip[x as usize] + 1;
-                            let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize] - 1);
-                            surface.draw_line_lt(
-                                &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
-                                &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
-                                &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
-                            );
+                            let ceiling_wall_y1 = self.upper_clip[x as usize];
+                            let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
+                            if ceiling_wall_y1 < ceiling_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                                );
+                            }
                         }
                         if b_draw_wall {
-                            let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize] + 1);
-                            let middle_wall_y2 = math::min(draw_wall_y2 + 1, self.lower_clip[x as usize] - 1);
-                            surface.draw_line_lt(
-                                &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
-                                &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
-                                &RenderSoftware::name_to_color(&wall_texture, &light_level)
-                            );
+                            let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
+                            let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
+                            if middle_wall_y1 < middle_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&wall_texture, &light_level)
+                                );
+                            }
                         }
                         if b_draw_floor {
-                            let floor_wall_y1 = math::max(draw_wall_y2 + 1, self.upper_clip[x as usize] + 1);
-                            let floor_wall_y2 = self.lower_clip[x as usize] - 1;
-                            surface.draw_line_lt(
-                                &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
-                                &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
-                                &RenderSoftware::name_to_color(&floor_texture, &light_level)
-                            );
+                            let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
+                            let floor_wall_y2 = self.lower_clip[x as usize];
+                            if floor_wall_y1 < floor_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                                );
+                            }
                         }
                         // Next step
                         wall_y1 += wall_y1_step;
                         wall_y2 += wall_y2_step;
                     }
                 },
-                _ => {}
+                WallType::PortalWall(ref_seg) => {
+                    // Alias
+                    let seg = *ref_seg;
+                    let line = seg.line_defs(&self.map);
+                    let side = line.right_side(&self.map).unwrap();
+                    let right_sector = seg.right_sector(&self.map).unwrap();
+                    let left_sector = seg.left_sector(&self.map).unwrap();
+                    let angle = actor.angle() as f32;
+                    let position = Vector2::<f32>::from( actor.position() );
+                    let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
+                    let half_height = (self.size.height() / 2) as f32;
+                    // Texture
+                    let upper_texture = side.upper_texture;
+                    let lower_texture = side.lower_texture;
+                    let wall_texture = side.middle_texture;
+                    let floor_texture = right_sector.floor_texture;
+                    let ceiling_texture = right_sector.ceiling_texture;
+                    let light_level = math::clamp( right_sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    // Height of wall w/ rispect to player
+                    let right_wall_floor = right_sector.floor_height - *actor.height();
+                    let right_wall_ceiling = right_sector.ceiling_height - *actor.height();
+                    let left_wall_floor = left_sector.floor_height - *actor.height();
+                    let left_wall_ceiling = left_sector.ceiling_height - *actor.height();
+                    // set what to draw
+                    let mut b_draw_upper_wall = false;
+                    let mut b_draw_ceiling = false;
+                    let mut b_draw_floor = false;
+                    let mut b_draw_lower_wall = false;
+                    // What to draw
+                    if right_wall_ceiling != left_wall_ceiling 
+                    || right_sector.light_level != left_sector.light_level 
+                    || right_sector.ceiling_texture != left_sector.ceiling_texture {
+                        b_draw_upper_wall = upper_texture != consts::VOID_TEXTURE && left_wall_ceiling < right_wall_ceiling;
+                        b_draw_ceiling = right_wall_ceiling >= 0;
+                    }
+
+                    if right_wall_floor != left_wall_floor 
+                    || right_sector.light_level != left_sector.light_level 
+                    || right_sector.floor_texture != left_sector.floor_texture {
+                        b_draw_lower_wall = lower_texture != consts::VOID_TEXTURE && left_wall_floor > right_wall_floor;
+                        b_draw_floor = right_wall_floor <= 0;
+                    }
+                    // Test
+                    if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
+                        return;
+                    }
+                    // Calculate the scaling factors of the left and right edges of the wall range
+                    let wall_normal_angle = seg.float_degrees_angle() + 90.0;
+                    let offset_angle = wall_normal_angle - wall_angle;
+                    let hypotenuse = position.distance(&start_vertex);
+                    let wall_distance = hypotenuse * math::radians(offset_angle).cos();
+                    // Compute scale
+                    let wall_scale_1 = math::clamp(
+                        self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
+                        consts::MIN_SCALE, 
+                        consts::MAX_SCALE
+                    );
+                    let wall_scale_step = {
+                        if start < end {
+                            let wall_scale_2 = math::clamp(
+                                self.camera.scale_from_global_angle(end, wall_normal_angle, wall_distance, angle), 
+                                consts::MIN_SCALE, 
+                                consts::MAX_SCALE
+                            );
+                            (wall_scale_2 - wall_scale_1) / (end - start) as f32
+                        } else {
+                            0.0
+                        }
+                    };
+                    // Determine where on the screen the wall is drawn
+                    // Top wall
+                    let mut wall_y1 = half_height - right_wall_ceiling as f32 * wall_scale_1;
+                    let wall_y1_step = -wall_scale_step * right_wall_ceiling as f32;
+                    // Bottom wall
+                    let mut wall_y2 = half_height - right_wall_floor as f32 * wall_scale_1;
+                    let wall_y2_step = -wall_scale_step * right_wall_floor as f32;
+                    // Determinate y for the top and bottom walls
+                    let mut portal_y1 = wall_y2;
+                    let mut portal_y1_step = wall_y2_step;
+                    if b_draw_upper_wall && left_wall_ceiling > right_wall_floor {
+                            portal_y1 = half_height - left_wall_ceiling as f32 * wall_scale_1;
+                            portal_y1_step = -wall_scale_step * left_wall_ceiling as f32;
+                    }
+                    let mut portal_y2 = wall_y1;
+                    let mut portal_y2_step = wall_y1_step;
+                    if b_draw_lower_wall && left_wall_floor < right_wall_ceiling {
+                            portal_y2 = half_height - left_wall_floor as f32 * wall_scale_1;
+                            portal_y2_step = -wall_scale_step * left_wall_floor as f32;
+                    }
+
+                    // Draw
+                    for x in start..end {
+                        let draw_wall_y1 = wall_y1 as i32;
+                        let draw_wall_y2 = wall_y2 as i32;
+
+                        if b_draw_upper_wall {
+                            if b_draw_ceiling {
+                                let ceiling_wall_y1 = self.upper_clip[x as usize];
+                                let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
+                                if ceiling_wall_y1 < ceiling_wall_y2 {
+                                    surface.draw_line_lt(
+                                        &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
+                                        &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
+                                        &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                                    );
+                                }
+                            }
+                            let draw_upper_wall_y1 = wall_y1 as i32 - 1;
+                            let draw_upper_wall_y2 = portal_y1 as i32;
+
+                            let middle_wall_y1 = math::max(draw_upper_wall_y1, self.upper_clip[x as usize]);
+                            let middle_wall_y2 = math::min(draw_upper_wall_y2, self.lower_clip[x as usize]);
+                            if middle_wall_y1 < middle_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&upper_texture, &light_level)
+                                );
+                            }
+                            if self.upper_clip[x as usize] < middle_wall_y2 {
+                                self.upper_clip[x as usize] = middle_wall_y2
+                            }
+                            portal_y1 += portal_y1_step
+                        }
+
+                        if b_draw_ceiling {
+                            let ceiling_wall_y1 = self.upper_clip[x as usize];
+                            let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
+                            if ceiling_wall_y1 < ceiling_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                                );
+                            }
+                            if self.upper_clip[x as usize] < ceiling_wall_y2 {
+                                self.upper_clip[x as usize] = ceiling_wall_y2
+                            }
+                        }
+
+                        if b_draw_lower_wall {
+                            if b_draw_floor {
+                                let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
+                                let floor_wall_y2 = self.lower_clip[x as usize];
+                                if floor_wall_y1 < floor_wall_y2 {
+                                    surface.draw_line_lt(
+                                        &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
+                                        &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
+                                        &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                                    );
+                                }
+                            }
+                            let draw_lower_wall_y1 = portal_y2 as i32 - 1;
+                            let draw_lower_wall_y2 = wall_y2 as i32;
+
+                            let middle_wall_y1 =  math::max(draw_lower_wall_y1, self.upper_clip[x as usize]);
+                            let middle_wall_y2 = math::min(draw_lower_wall_y2, self.lower_clip[x as usize]);
+                            if middle_wall_y1 < middle_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&lower_texture, &light_level)
+                                );
+                            }
+                            if self.lower_clip[x as usize] > middle_wall_y1 {
+                                self.lower_clip[x as usize] = middle_wall_y1
+                            }
+                            portal_y2 += portal_y2_step
+                        }
+                        
+                        if b_draw_floor {
+                            let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
+                            let floor_wall_y2 = self.lower_clip[x as usize];
+                            if floor_wall_y1 < floor_wall_y2 {
+                                surface.draw_line_lt(
+                                    &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
+                                    &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
+                                    &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                                );
+                            }
+                            if self.lower_clip[x as usize] > draw_wall_y2 {
+                                self.lower_clip[x as usize] = floor_wall_y1;
+                            }
+                        }
+                        // Next step
+                        wall_y1 += wall_y1_step;
+                        wall_y2 += wall_y2_step;
+                    }
+                }
             }
         }
 
-        fn draw_vline(&self, surface: &mut DoomSurface, x: u32, color: &[u8]){
-            let x_start = Vector2::new(x as i32, self.offset.y);
-            let x_end = Vector2::new(x as i32, self.size.y + self.offset.y);
-            surface.draw_line_lt(&x_start, &x_end, color);
-        }
-
-        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType, mut wall_x_start: u32, mut wall_x_end: u32, raw_angle: f32) -> bool {
+        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, mut wall_x_start: u32, mut wall_x_end: u32, raw_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -546,7 +739,6 @@ pub mod render_3d {
                         self.screen_range[xe as usize] = false;
                     }
                     xe += 1;
-                    continue;
                 }
                 if (xe - xs) > 0 {
                     self.draw_wall(actor, surface, wtype, xs, xe, raw_angle);
