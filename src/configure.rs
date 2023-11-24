@@ -1,4 +1,5 @@
 
+#![allow(dead_code)]
 use ini::{Ini, Properties};
 use crate::math::{Vector2, Vector4};
 

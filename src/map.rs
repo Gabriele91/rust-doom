@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::ops::Range;
 use std::{mem, vec};
 use std::rc::Rc;

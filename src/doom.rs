@@ -1,7 +1,6 @@
 // Using engine
 use crate::actors::Actor;
 use crate::bsp::BSP;
-use crate::camera::Camera;
 use crate::configure::Configure;
 use crate::render::{
     render_2d::{RenderBSP, RenderCamera, RenderMap},

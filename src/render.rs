@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Using engine
 use crate::doom::Doom;
 // Trait
@@ -102,7 +103,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderMap<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, _last_frame_time: f64, _blending_factor: f64) {
             // Ref
             let surface = &mut doom.surface.borrow_mut();
             // Draw lines
@@ -189,7 +190,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderBSP<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, _last_frame_time: f64, _blending_factor: f64) {
             // Ref to bsp
             let bsp = &doom.bsp;
             let surface = doom.surface.clone();
@@ -262,7 +263,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderCamera<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, _last_frame_time: f64, _blending_factor: f64) {
             // Ref to bsp
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
@@ -546,7 +547,7 @@ pub mod render_3d {
                     // Texture
                     let upper_texture = side.upper_texture;
                     let lower_texture = side.lower_texture;
-                    let wall_texture = side.middle_texture;
+                    let _wall_texture = side.middle_texture;
                     let floor_texture = right_sector.floor_texture;
                     let ceiling_texture = right_sector.ceiling_texture;
                     let light_level = math::clamp( right_sector.light_level as f32 / 255.0, 0.0, 1.0);
@@ -724,7 +725,7 @@ pub mod render_3d {
             }
         }
 
-        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, mut wall_x_start: u32, mut wall_x_end: u32, raw_angle: f32) -> bool {
+        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, wall_x_start: u32, wall_x_end: u32, raw_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -752,7 +753,7 @@ pub mod render_3d {
     }
 
     impl crate::render::Render for RenderSoftware<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, _last_frame_time: f64, _blending_factor: f64) {
             // Clear
             self.reset();
             // Ref to bsp
