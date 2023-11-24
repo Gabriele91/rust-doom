@@ -1,6 +1,6 @@
 
 // Engine
-use crate::math::{Vector2, normalize_degrees};
+use crate::math::{Vector2, normalize_degrees, radians};
 use crate::map::Thing;
 use crate::doom::Doom;
 use crate::configure::Configure;
@@ -27,6 +27,7 @@ pub struct Player {
     angle: u16,
     flags: u16,
     // local
+    internal_increment: Vector2<f32>, 
     internal_position: Vector2<f32>,
     internal_angle: f32,
     internal_height: i16,
@@ -47,7 +48,8 @@ impl Player {
             height: 0,
             angle: angle,
             flags: thing.flags,
-            // local
+            // local            
+            internal_increment: Vector2::zeros(),
             internal_position: Vector2::<f32>::from(&position),
             internal_angle: thing.angle as f32,
             internal_height:0,
@@ -62,26 +64,38 @@ impl Player {
 #[allow(unused_variables)]
 impl Actor for Player {
     fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        // Position
+        let psin = radians(self.internal_angle - 90.0).sin();
+        let pcos = radians(self.internal_angle - 90.0).cos();
+        self.internal_position += Vector2::new(
+            self.internal_increment.x * pcos - self.internal_increment.y * psin,
+            self.internal_increment.x * psin + self.internal_increment.y * pcos,
+        );
+        self.position = Vector2::<i16>::from(&self.internal_position);
+        self.internal_increment = Vector2::zeros();
+        // Height
         self.internal_height = engine.bsp.floor_height(self.position());
         self.height = self.internal_height + self.player_height;    
+        // Angle
+        self.angle = self.internal_angle as u16;
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
         if  input.key_held(KeyCode::KeyW) 
         && !input.key_held(KeyCode::KeyS) {
-            self.internal_position += Vector2::new(0.0, self.speed);
+            self.internal_increment += Vector2::new(0.0, self.speed);
         }
         if !input.key_held(KeyCode::KeyW) 
         &&  input.key_held(KeyCode::KeyS) {
-            self.internal_position -= Vector2::new(0.0, self.speed);
+            self.internal_increment -= Vector2::new(0.0, self.speed);
         }        
         if  input.key_held(KeyCode::KeyA) 
         && !input.key_held(KeyCode::KeyD) {
-            self.internal_position -= Vector2::new(self.speed, 0.0);
+            self.internal_increment -= Vector2::new(self.speed, 0.0);
         }
         if !input.key_held(KeyCode::KeyA) 
         &&  input.key_held(KeyCode::KeyD) {
-            self.internal_position += Vector2::new(self.speed, 0.0);
+            self.internal_increment += Vector2::new(self.speed, 0.0);
         }      
         if  input.key_held(KeyCode::ArrowLeft) 
         && !input.key_held(KeyCode::ArrowRight) {
@@ -91,10 +105,6 @@ impl Actor for Player {
         &&  input.key_held(KeyCode::ArrowRight) {
             self.internal_angle = normalize_degrees(self.internal_angle - self.angle_speed);
         }
-        // Apply out side
-        self.position = Vector2::<i16>::from(&self.internal_position);
-        self.angle = self.internal_angle as u16;
-        self.height = self.internal_height + self.player_height;
 
     }
 
