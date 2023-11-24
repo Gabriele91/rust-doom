@@ -26,6 +26,28 @@ impl<'wad> BSP<'wad> {
         }
     }
 
+    pub fn floor_height(&self, position: &Vector2<i16>) -> i16 {
+        // Looking for sector id
+        let mut node_id = self.root_id;
+        // Search for the segment
+        while node_id < SUBSECTORIDENTIFIER {
+            let node = self.map.nodes[node_id as usize];
+            if self.is_on_left_size(&position, node_id) {
+                node_id = node.left_child_id;
+            } else {
+                node_id = node.right_child_id;
+            }
+        }
+        if node_id & SUBSECTORIDENTIFIER > 0 { 
+            let sub_sector_id = node_id & (!SUBSECTORIDENTIFIER);
+            let first_seg_id = self.map.sub_sectors[sub_sector_id as usize].first_seg_id;
+            if let Some(sector) = self.map.segs[first_seg_id as usize].right_sector(&self.map) {
+                return sector.floor_height;
+            }
+        }
+        return 0;
+    }
+
     pub fn visit<'a,'b, T>(&mut self, position: &Vector2<i16>, context: &mut T, callback: impl FnMut(u16, &mut T) -> bool + 'a, test_node: impl FnMut(&NodeBox, &mut T) -> bool + 'b) {
         self.visit_aux(&position, context, self.root_id, callback, test_node);
     }

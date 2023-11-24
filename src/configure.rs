@@ -17,6 +17,12 @@ pub struct Camera {
     pub fov: f32,
 }
 
+pub struct Player {
+    pub speed: f32,
+    pub angle_speed: f32,
+    pub height: i16,
+}
+
 pub struct Render {
     pub map_2d: Option<Vector4<i32>>, 
     pub bsp_2d: Option<Vector4<i32>>, 
@@ -29,6 +35,7 @@ pub struct Configure {
     pub resource: Resource,
     pub screen: Screen,
     pub camera: Camera,
+    pub player: Player,
     pub render: Option<Render>,
 }
 
@@ -90,6 +97,16 @@ impl Camera {
     }
 }
 
+impl Player {
+    pub fn from(props: &Properties) -> Option<Self> {
+        Some(Player { 
+            speed: props.get("speed")?.parse().ok()?,
+            angle_speed: props.get("angle_speed")?.parse().ok()?,
+            height: props.get("height")?.parse().ok()?,
+        })
+    }
+}
+
 impl Screen {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Screen { 
@@ -122,6 +139,7 @@ impl Configure {
                 resource : Resource::from(ini.section(Some("Resource"))?)?,
                 screen : Screen::from(ini.section(Some("Screen"))?)?,
                 camera : Camera::from(ini.section(Some("Camera"))?)?,
+                player : Player::from(ini.section(Some("Player"))?)?,
                 render : Render::from(ini.section(Some("Render"))),
             });
         }

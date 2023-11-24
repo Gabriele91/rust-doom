@@ -2,7 +2,7 @@
 use crate::doom::Doom;
 // Trait
 pub trait Render {
-    fn draw<'wad>(&mut self, doom: &mut Doom<'wad>);
+    fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64);
 }
 
 pub mod render_2d {
@@ -102,7 +102,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderMap<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
             // Ref
             let surface = &mut doom.surface.borrow_mut();
             // Draw lines
@@ -189,7 +189,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderBSP<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
             // Ref to bsp
             let bsp = &doom.bsp;
             let surface = doom.surface.clone();
@@ -262,7 +262,7 @@ pub mod render_2d {
     }
 
     impl crate::render::Render for RenderCamera<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
             // Ref to bsp
             let bsp = &mut doom.bsp;
             let surface = doom.surface.clone();
@@ -752,7 +752,7 @@ pub mod render_3d {
     }
 
     impl crate::render::Render for RenderSoftware<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>) {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
             // Clear
             self.reset();
             // Ref to bsp

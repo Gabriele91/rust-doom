@@ -61,7 +61,7 @@ impl<'wad> Doom<'wad> {
             input: WinitInputHelper::new(),
             map: map.clone(),
             bsp: BSP::new(&map),
-            actors: Doom::create_actors(&map),
+            actors: Doom::create_actors(&map, &configure),
             // Render
             surface,
             renders: {
@@ -103,22 +103,22 @@ impl<'wad> Doom<'wad> {
         })
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, last_frame_time: f64, blending_factor: f64) {
         for actor in &self.actors {
-            actor.borrow_mut().update(self);
+            actor.borrow_mut().update(self, last_frame_time, blending_factor);
         }
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self, last_frame_time: f64, blending_factor: f64) {
         self.surface.borrow_mut().clear([0, 0, 0, 0]);
         for render_id in 0..self.renders.len() {
             let render = self.renders[render_id].clone();
-            render.borrow_mut().draw(self);
+            render.borrow_mut().draw(self, last_frame_time, blending_factor);
         }
         self.surface.borrow_mut().swap().unwrap();
     }
 
-    pub fn control(&mut self, event: &Event<()>) -> bool {
+    pub fn control(&mut self, event: &Event<()>, last_frame_time: f64, blending_factor: f64) -> bool {
         // Input
         if self.input.update(&event) {
             // Close events
@@ -126,18 +126,18 @@ impl<'wad> Doom<'wad> {
                 return false;
             } else {
                 for actor in &mut self.actors {
-                    actor.borrow_mut().control(&self.input);
+                    actor.borrow_mut().control(&self.input, last_frame_time, blending_factor);
                 }
             }
         }
         return true;
     }
 
-    fn create_actors(map: &Rc<Map<'wad>>) -> Vec<Rc<RefCell<Box<dyn Actor>>>> {
+    fn create_actors(map: &Rc<Map<'wad>>, configure: &Configure) -> Vec<Rc<RefCell<Box<dyn Actor>>>> {
         let mut actors = vec![];
         for thing in &map.things {
             match thing.type_id {
-                1 => actors.push(Rc::new(RefCell::new(Player::new(&thing)))),
+                1 => actors.push(Rc::new(RefCell::new(Player::new(&thing, &configure)))),
                 _ => (),
             }
         }

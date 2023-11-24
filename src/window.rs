@@ -36,9 +36,9 @@ pub struct DoomLoopState<C, T: TimeTrait, W> {
     #[readonly]
     pub(super) fixed_time_step: f64,
     #[readonly]
-    pub(super) number_of_updates: u32,
+    pub(super) number_of_updates: u64,
     #[readonly]
-    pub(super) number_of_renders: u32,
+    pub(super) number_of_renders: u64,
     #[readonly]
     pub(super) last_frame_time: f64,
     #[readonly]
@@ -226,18 +226,17 @@ impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
 
         while g.accumulated_time >= g.fixed_time_step {
             update(g);
-
             g.accumulated_time -= g.fixed_time_step;
-            g.number_of_updates += 1;
+            g.number_of_updates = g.number_of_updates.wrapping_add(1);
         }
-
+        
         g.blending_factor = g.accumulated_time / g.fixed_time_step;
 
         if g.window_occluded && T::supports_sleep() {
             T::sleep(g.fixed_time_step);
         } else {
             render(g);
-            g.number_of_renders += 1;
+            g.number_of_renders = g.number_of_renders.wrapping_add(1);
         }
 
         g.previous_instant = g.current_instant;
@@ -247,20 +246,16 @@ impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
 
     pub fn re_accumulate(&mut self) {
         let g = self;
-
+        // Current type
         g.current_instant = T::now();
-
+        // Elapse
         let prev_elapsed = g.last_frame_time;
         let new_elapsed = g.current_instant.sub(&g.previous_instant);
-
         let delta = new_elapsed - prev_elapsed;
-
         // We don't update g.last_frame_time since this additional time in the
         // render function is considered part of the current frame.
-
         g.running_time += delta;
         g.accumulated_time += delta;
-
         g.blending_factor = g.accumulated_time / g.fixed_time_step;
     }
 
@@ -346,15 +341,15 @@ macro_rules! make_doom_loop {
             $window,
             $context,
             $frame,
-            1.0 / ($frame as f64),
+            1.0 / (($frame / 2) as f64), // max is 50% of the frame time
             |dl| {
-                dl.context.update();
+                dl.context.update(dl.last_frame_time, dl.blending_factor);
             },
             |dl| {
-                dl.context.draw();
+                dl.context.draw(dl.last_frame_time, dl.blending_factor);
             },
             |dl, event| {
-                if !dl.context.control(&event) {
+                if !dl.context.control(&event, dl.last_frame_time, dl.blending_factor) {
                     dl.exit();
                 }
             },
