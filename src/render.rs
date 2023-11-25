@@ -432,6 +432,16 @@ pub mod render_3d {
             }
         }
 
+        fn draw_line(&self, surface: &mut DoomSurface, x: i32, mut y1: i32, mut y2: i32, color: &[u8]) {
+            y1 = math::clamp(y1, 0, self.size.y);
+            y2 = math::clamp(y2, 0, self.size.y);
+            if x < self.size.x && y1 < y2 {
+                let start = Vector2::new(x as i32, y1) + self.offset;
+                let end = Vector2::new(x as i32, y2) + self.offset;
+                surface.draw_line_lt(&start, &end, &color);
+            }
+        }
+
         fn draw_wall(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
             match wtype {
                 WallType::SolidWall(ref_seg) => {
@@ -498,35 +508,35 @@ pub mod render_3d {
                         if b_draw_ceiling {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                            if ceiling_wall_y1 < ceiling_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                ceiling_wall_y1, 
+                                ceiling_wall_y2, 
+                                &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                            );
                         }
                         if b_draw_wall {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
-                            if middle_wall_y1 < middle_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&wall_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                middle_wall_y1, 
+                                middle_wall_y2, 
+                                &RenderSoftware::name_to_color(&wall_texture, &light_level)
+                            );
                         }
                         if b_draw_floor {
                             let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
                             let floor_wall_y2 = self.lower_clip[x as usize];
-                            if floor_wall_y1 < floor_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&floor_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                floor_wall_y1, 
+                                floor_wall_y2, 
+                                &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                            );
                         }
                         // Next step
                         wall_y1 += wall_y1_step;
@@ -632,26 +642,26 @@ pub mod render_3d {
                             if b_draw_ceiling {
                                 let ceiling_wall_y1 = self.upper_clip[x as usize];
                                 let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                                if ceiling_wall_y1 < ceiling_wall_y2 {
-                                    surface.draw_line_lt(
-                                        &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
-                                        &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
-                                        &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
-                                    );
-                                }
+                                self.draw_line(
+                                    surface, 
+                                    x as i32, 
+                                    ceiling_wall_y1, 
+                                    ceiling_wall_y2, 
+                                    &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                                );
                             }
                             let draw_upper_wall_y1 = wall_y1 as i32 - 1;
                             let draw_upper_wall_y2 = portal_y1 as i32;
 
                             let middle_wall_y1 = math::max(draw_upper_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_upper_wall_y2, self.lower_clip[x as usize]);
-                            if middle_wall_y1 < middle_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&upper_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                middle_wall_y1, 
+                                middle_wall_y2, 
+                                &RenderSoftware::name_to_color(&upper_texture, &light_level)
+                            );
                             if self.upper_clip[x as usize] < middle_wall_y2 {
                                 self.upper_clip[x as usize] = middle_wall_y2
                             }
@@ -661,13 +671,13 @@ pub mod render_3d {
                         if b_draw_ceiling {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                            if ceiling_wall_y1 < ceiling_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, ceiling_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, ceiling_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                ceiling_wall_y1, 
+                                ceiling_wall_y2, 
+                                &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                            );
                             if self.upper_clip[x as usize] < ceiling_wall_y2 {
                                 self.upper_clip[x as usize] = ceiling_wall_y2
                             }
@@ -677,26 +687,26 @@ pub mod render_3d {
                             if b_draw_floor {
                                 let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
                                 let floor_wall_y2 = self.lower_clip[x as usize];
-                                if floor_wall_y1 < floor_wall_y2 {
-                                    surface.draw_line_lt(
-                                        &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
-                                        &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
-                                        &RenderSoftware::name_to_color(&floor_texture, &light_level)
-                                    );
-                                }
+                                self.draw_line(
+                                    surface, 
+                                    x as i32, 
+                                    floor_wall_y1, 
+                                    floor_wall_y2, 
+                                    &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                                );
                             }
                             let draw_lower_wall_y1 = portal_y2 as i32 - 1;
                             let draw_lower_wall_y2 = wall_y2 as i32;
 
                             let middle_wall_y1 =  math::max(draw_lower_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_lower_wall_y2, self.lower_clip[x as usize]);
-                            if middle_wall_y1 < middle_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, middle_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, middle_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&lower_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                middle_wall_y1, 
+                                middle_wall_y2, 
+                                &RenderSoftware::name_to_color(&lower_texture, &light_level)
+                            );
                             if self.lower_clip[x as usize] > middle_wall_y1 {
                                 self.lower_clip[x as usize] = middle_wall_y1
                             }
@@ -706,13 +716,13 @@ pub mod render_3d {
                         if b_draw_floor {
                             let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
                             let floor_wall_y2 = self.lower_clip[x as usize];
-                            if floor_wall_y1 < floor_wall_y2 {
-                                surface.draw_line_lt(
-                                    &(Vector2::new(x as i32, floor_wall_y1) + self.offset), 
-                                    &(Vector2::new(x as i32, floor_wall_y2) + self.offset), 
-                                    &RenderSoftware::name_to_color(&floor_texture, &light_level)
-                                );
-                            }
+                            self.draw_line(
+                                surface, 
+                                x as i32, 
+                                floor_wall_y1, 
+                                floor_wall_y2, 
+                                &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                            );
                             if self.lower_clip[x as usize] > draw_wall_y2 {
                                 self.lower_clip[x as usize] = floor_wall_y1;
                             }
