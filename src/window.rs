@@ -208,56 +208,54 @@ impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
         U: FnMut(&mut DoomLoopState<C, T, W>),
         R: FnMut(&mut DoomLoopState<C, T, W>),
     {
-        let g = self;
-
-        if g.exit_next_iteration {
+        // Get out loop
+        if self.exit_next_iteration {
             return false;
         }
-
-        g.current_instant = T::now();
-
-        let mut elapsed = g.current_instant.sub(&g.previous_instant);
-        if elapsed > g.max_frame_time {
-            elapsed = g.max_frame_time;
+        // Get current time
+        self.current_instant = T::now();
+        // Compute delta
+        let mut elapsed = self.current_instant.sub(&self.previous_instant);
+        if elapsed > self.max_frame_time {
+            elapsed = self.max_frame_time;
         }
-
-        g.last_frame_time = elapsed;
-        g.running_time += elapsed;
-        g.accumulated_time += elapsed;
-
-        while g.accumulated_time >= g.fixed_time_step {
-            update(g);
-            g.accumulated_time -= g.fixed_time_step;
-            g.number_of_updates = g.number_of_updates.wrapping_add(1);
+        // Update delta
+        self.last_frame_time = elapsed;
+        self.running_time += elapsed;
+        self.accumulated_time += elapsed;
+        // Logic update
+        while self.accumulated_time >= self.fixed_time_step {
+            update(self);
+            self.accumulated_time -= self.fixed_time_step;
+            self.number_of_updates = self.number_of_updates.wrapping_add(1);
         }
-
-        g.blending_factor = g.accumulated_time / g.fixed_time_step;
-
-        if g.window_occluded && T::supports_sleep() {
-            T::sleep(g.fixed_time_step);
+        // Blending among 2 frames
+        self.blending_factor = self.accumulated_time / self.fixed_time_step;
+        // Update render
+        if self.window_occluded && T::supports_sleep() {
+            T::sleep(self.fixed_time_step);
         } else {
-            render(g);
-            g.number_of_renders = g.number_of_renders.wrapping_add(1);
+            render(self);
+            self.number_of_renders = self.number_of_renders.wrapping_add(1);
         }
-
-        g.previous_instant = g.current_instant;
-
-        true
+        // Save current time as previous time
+        self.previous_instant = self.current_instant;
+        // Ok
+        return true;
     }
 
     pub fn re_accumulate(&mut self) {
-        let g = self;
         // Current type
-        g.current_instant = T::now();
+        self.current_instant = T::now();
         // Elapse
-        let prev_elapsed = g.last_frame_time;
-        let new_elapsed = g.current_instant.sub(&g.previous_instant);
+        let prev_elapsed = self.last_frame_time;
+        let new_elapsed = self.current_instant.sub(&self.previous_instant);
         let delta = new_elapsed - prev_elapsed;
-        // We don't update g.last_frame_time since this additional time in the
+        // We don't update self.last_frame_time since this additional time in the
         // render function is considered part of the current frame.
-        g.running_time += delta;
-        g.accumulated_time += delta;
-        g.blending_factor = g.accumulated_time / g.fixed_time_step;
+        self.running_time += delta;
+        self.accumulated_time += delta;
+        self.blending_factor = self.accumulated_time / self.fixed_time_step;
     }
 
     pub fn exit(&mut self) {
@@ -343,7 +341,7 @@ macro_rules! make_doom_loop {
             $window,
             $context,
             $frame,
-            1.0 / ($frame as f64),
+            1.0, // max time difference among 2 frames 
             |dl| {
                 dl.context.update(dl.last_frame_time, dl.blending_factor);
             },

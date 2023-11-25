@@ -86,7 +86,7 @@ impl<T> Vector4<T> where T: std::str::FromStr, <T as std::str::FromStr>::Err: st
 fn bool_from_str(value: Option<&str>) -> Option<bool> {
     match value?.trim() {
         "true" => Some(true),        
-        "yes" => Some(false),
+        "yes" => Some(true),
         "t" => Some(true),
         "y" => Some(true),
         "1" => Some(true),

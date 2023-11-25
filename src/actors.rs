@@ -27,10 +27,13 @@ pub struct Player {
     angle: u16,
     flags: u16,
     // local
-    internal_increment: Vector2<f32>, 
     internal_position: Vector2<f32>,
     internal_angle: f32,
     internal_height: i16,
+    // Control
+    control_direction: Vector2<f32>, 
+    control_angle: f32,
+    control_angle_update: f32,
     // Settings
     speed: f32,
     angle_speed: f32,
@@ -49,10 +52,13 @@ impl Player {
             angle: angle,
             flags: thing.flags,
             // local            
-            internal_increment: Vector2::zeros(),
             internal_position: Vector2::<f32>::from(&position),
             internal_angle: thing.angle as f32,
             internal_height:0,
+            // Control
+            control_direction: Vector2::zeros(),
+            control_angle: 0.0,
+            control_angle_update: 0.0,
             // Configure
             speed: configure.player.speed,
             angle_speed: configure.player.angle_speed,
@@ -64,48 +70,60 @@ impl Player {
 #[allow(unused_variables)]
 impl Actor for Player {
     fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
-        // Position
-        let psin = radians(self.internal_angle - 90.0).sin();
-        let pcos = radians(self.internal_angle - 90.0).cos();
-        self.internal_position += Vector2::new(
-            self.internal_increment.x * pcos - self.internal_increment.y * psin,
-            self.internal_increment.x * psin + self.internal_increment.y * pcos,
-        );
+        // Angle
+        if self.control_angle != 0.0 {
+            self.control_angle /= self.control_angle_update;
+            self.internal_angle = normalize_degrees(self.internal_angle + (self.control_angle * self.angle_speed));
+            self.control_angle = 0.0;
+            self.control_angle_update = 0.0;
+        }
+        self.angle = self.internal_angle as u16;
+        // Get move direction
+        if self.control_direction.x != 0.0 || self.control_direction.y != 0.0 {
+            let direction = self.control_direction.normalize();
+            self.control_direction = Vector2::zeros();
+            // Move rotation
+            let psin = radians(self.internal_angle - 90.0).sin();
+            let pcos = radians(self.internal_angle - 90.0).cos();
+            // New position
+            self.internal_position += Vector2::new(
+                direction.x * pcos - direction.y * psin,
+                direction.x * psin + direction.y * pcos,
+            ) * self.speed;
+        }
         self.position = Vector2::<i16>::from(&self.internal_position);
-        self.internal_increment = Vector2::zeros();
         // Height
         self.internal_height = engine.bsp.floor_height(self.position());
         self.height = self.internal_height + self.player_height;    
-        // Angle
-        self.angle = self.internal_angle as u16;
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
         if  input.key_held(KeyCode::KeyW) 
         && !input.key_held(KeyCode::KeyS) {
-            self.internal_increment += Vector2::new(0.0, self.speed);
+            self.control_direction += Vector2::new(0.0, 1.0);
         }
         if !input.key_held(KeyCode::KeyW) 
         &&  input.key_held(KeyCode::KeyS) {
-            self.internal_increment -= Vector2::new(0.0, self.speed);
+            self.control_direction -= Vector2::new(0.0, 1.0);
         }        
         if  input.key_held(KeyCode::KeyA) 
         && !input.key_held(KeyCode::KeyD) {
-            self.internal_increment -= Vector2::new(self.speed, 0.0);
+            self.control_direction -= Vector2::new(1.0, 0.0);
         }
         if !input.key_held(KeyCode::KeyA) 
         &&  input.key_held(KeyCode::KeyD) {
-            self.internal_increment += Vector2::new(self.speed, 0.0);
+            self.control_direction += Vector2::new(1.0, 0.0);
         }      
         if  input.key_held(KeyCode::ArrowLeft) 
         && !input.key_held(KeyCode::ArrowRight) {
-            self.internal_angle = normalize_degrees(self.internal_angle + self.angle_speed);
+            self.control_angle += 1.0;
+            self.control_angle_update += 1.0;
         }
         if !input.key_held(KeyCode::ArrowLeft) 
         &&  input.key_held(KeyCode::ArrowRight) {
-            self.internal_angle = normalize_degrees(self.internal_angle - self.angle_speed);
+            self.control_angle -= 1.0;
+            self.control_angle_update += 1.0;
         }
-
     }
 
     fn type_id(&self) -> u16 {
