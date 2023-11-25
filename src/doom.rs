@@ -49,6 +49,7 @@ impl<'wad> Doom<'wad> {
                     configure.screen.surface.width(),
                     configure.screen.surface.height(),
                 ),
+                configure.screen.vsync,
                 &window,
             )
             .unwrap(),

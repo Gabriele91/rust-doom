@@ -11,7 +11,8 @@ pub struct Screen {
     pub title: String,
     pub window: Vector2<f64>, 
     pub surface: Vector2<u32>, 
-    pub frame_rate: u32
+    pub frame_rate: u32,
+    pub vsync: bool
 }
 
 pub struct Camera {
@@ -38,14 +39,6 @@ pub struct Configure {
     pub camera: Camera,
     pub player: Player,
     pub render: Option<Render>,
-}
-
-impl Resource {
-    pub fn from(props: &Properties) -> Option<Self> {
-        Some(Resource { 
-            wad: String::from(props.get("wad")?),
-        })
-    }
 }
 
 impl<T> Vector2<T> where T: std::str::FromStr, <T as std::str::FromStr>::Err: std::fmt::Debug {
@@ -90,6 +83,30 @@ impl<T> Vector4<T> where T: std::str::FromStr, <T as std::str::FromStr>::Err: st
     }
 }
 
+fn bool_from_str(value: Option<&str>) -> Option<bool> {
+    match value?.trim() {
+        "true" => Some(true),        
+        "yes" => Some(false),
+        "t" => Some(true),
+        "y" => Some(true),
+        "1" => Some(true),
+        "false" => Some(false),
+        "no" => Some(false),
+        "f" => Some(false),
+        "n" => Some(false),
+        "0" => Some(false),
+        _ => None
+    }
+}
+
+impl Resource {
+    pub fn from(props: &Properties) -> Option<Self> {
+        Some(Resource { 
+            wad: String::from(props.get("wad")?),
+        })
+    }
+}
+
 impl Camera {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Camera { 
@@ -114,7 +131,8 @@ impl Screen {
             title: String::from(props.get("title")?),
             window: Vector2::<f64>::from_str(props.get("window")?)?,
             surface: Vector2::<u32>::from_str(props.get("surface")?)?,
-            frame_rate: props.get("frame_rate")?.parse().ok()?
+            frame_rate: props.get("frame_rate")?.parse().ok()?,
+            vsync: bool_from_str(props.get("vsync")).unwrap_or(false),
         })
     }
 }

@@ -5,14 +5,14 @@ use crate::math::Vector2;
 use crate::shape::Size;
 use crate::time::{Time, TimeTrait};
 // Using
-use pixels::{Error, Pixels, SurfaceTexture};
+use pixels::{Error, Pixels, PixelsBuilder, SurfaceTexture};
 use readonly;
 use winit::{
     dpi::{LogicalSize, PhysicalSize},
+    error::EventLoopError,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
-    error::EventLoopError
 };
 
 pub struct DoomSurface {
@@ -54,9 +54,12 @@ pub struct DoomLoopState<C, T: TimeTrait, W> {
 }
 
 impl DoomSurface {
-    pub fn new(size: PhysicalSize<u32>, window: &Window) -> Option<Self> {
+    pub fn new(size: PhysicalSize<u32>, vsync: bool, window: &Window) -> Option<Self> {
         let surface = SurfaceTexture::new(size.width, size.height, &window);
-        if let Ok(pixels) = Pixels::new(size.width, size.height, surface) {
+        if let Ok(pixels) = PixelsBuilder::new(size.width, size.height, surface)
+            .enable_vsync(vsync)
+            .build()
+        {
             Some(DoomSurface { size, pixels })
         } else {
             None
@@ -73,7 +76,6 @@ impl DoomSurface {
         self.pixels.render()
     }
 
-    
     pub fn draw_lt(&mut self, position: &Vector2<usize>, color: &[u8]) {
         let size = self.pixels.texture().size();
         let channels = self.pixels.texture().format().block_size(None).unwrap() as usize;
@@ -93,28 +95,28 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_line_lt(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+    pub fn draw_line_lt(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]) {
         let dx = (to.x - from.x).abs();
         let dy = (to.y - from.y).abs();
-    
+
         let step_x = if to.x > from.x { 1 } else { -1 };
         let step_y = if to.y > from.y { 1 } else { -1 };
-    
+
         let mut x = from.x;
         let mut y = from.y;
-    
+
         let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
-    
+
         while x != to.x || y != to.y {
             self.draw_lt(&Vector2::new(x as usize, y as usize), color);
-    
+
             let err2 = err;
-    
+
             if err2 > -dx {
                 err -= dy;
                 x += step_x;
             }
-    
+
             if err2 < dy {
                 err += dx;
                 y += step_y;
@@ -142,28 +144,28 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_line_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+    pub fn draw_line_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]) {
         let dx = (to.x - from.x).abs();
         let dy = (to.y - from.y).abs();
-    
+
         let step_x = if to.x > from.x { 1 } else { -1 };
         let step_y = if to.y > from.y { 1 } else { -1 };
-    
+
         let mut x = from.x;
         let mut y = from.y;
-    
+
         let mut err = if dx > dy { dx / 2 } else { -dy / 2 };
-    
+
         while x != to.x || y != to.y {
             self.draw_lb(&Vector2::new(x as usize, y as usize), color);
-    
+
             let err2 = err;
-    
+
             if err2 > -dx {
                 err -= dy;
                 x += step_x;
             }
-    
+
             if err2 < dy {
                 err += dx;
                 y += step_y;
@@ -171,13 +173,12 @@ impl DoomSurface {
         }
     }
 
-    pub fn draw_box_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]){
+    pub fn draw_box_lb(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]) {
         self.draw_line_lb(&from, &Vector2::new(from.x, to.y), &color);
         self.draw_line_lb(&from, &Vector2::new(to.x, from.y), &color);
         self.draw_line_lb(&Vector2::new(from.x, to.y), &to, &color);
         self.draw_line_lb(&Vector2::new(to.x, from.y), &to, &color);
     }
-
 }
 
 impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
@@ -229,7 +230,7 @@ impl<C, T: TimeTrait, W> DoomLoopState<C, T, W> {
             g.accumulated_time -= g.fixed_time_step;
             g.number_of_updates = g.number_of_updates.wrapping_add(1);
         }
-        
+
         g.blending_factor = g.accumulated_time / g.fixed_time_step;
 
         if g.window_occluded && T::supports_sleep() {
@@ -303,7 +304,8 @@ where
     H: FnMut(&mut DoomLoopState<C, Time, Arc<Window>>, &Event<T>) + 'static,
     T: 'static,
 {
-    let mut doom_loop_state = DoomLoopState::new(context, updates_per_second, max_frame_time, window);
+    let mut doom_loop_state =
+        DoomLoopState::new(context, updates_per_second, max_frame_time, window);
     event_loop.run(move |event: Event<T>, elwt| {
         elwt.set_control_flow(ControlFlow::Poll);
 
@@ -341,7 +343,7 @@ macro_rules! make_doom_loop {
             $window,
             $context,
             $frame,
-            1.0 / (($frame / 2) as f64), // max is 50% of the frame time
+            1.0 / ($frame as f64),
             |dl| {
                 dl.context.update(dl.last_frame_time, dl.blending_factor);
             },
@@ -349,7 +351,10 @@ macro_rules! make_doom_loop {
                 dl.context.draw(dl.last_frame_time, dl.blending_factor);
             },
             |dl, event| {
-                if !dl.context.control(&event, dl.last_frame_time, dl.blending_factor) {
+                if !dl
+                    .context
+                    .control(&event, dl.last_frame_time, dl.blending_factor)
+                {
                     dl.exit();
                 }
             },
