@@ -11,6 +11,7 @@ mod time;
 mod wad;
 mod window;
 mod camera;
+mod data_textures;
 // Using engine
 use configure::Configure;
 use doom::Doom;

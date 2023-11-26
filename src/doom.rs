@@ -2,6 +2,7 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
+use crate::render::render_2d::RenderFlats;
 use crate::render::{
     render_2d::{RenderBSP, RenderCamera, RenderMap},
     render_3d::RenderSoftware,
@@ -11,6 +12,7 @@ use crate::shape::Size;
 use crate::wad::Reader;
 use crate::window::DoomSurface;
 use crate::{actors::Player, map::Map};
+use crate::data_textures::DataTextures;
 // Utils
 use std::boxed::Box;
 use std::cell::RefCell;
@@ -26,6 +28,7 @@ pub struct Doom<'wad> {
 
     pub input: WinitInputHelper,
     pub map: Rc<Map<'wad>>,
+    pub data_textures: Rc<DataTextures<'wad>>,
     pub bsp: BSP<'wad>,
     pub actors: Vec<Rc<RefCell<Box<dyn Actor>>>>,
 
@@ -43,6 +46,7 @@ impl<'wad> Doom<'wad> {
     pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
         let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
         let map = Rc::new(Map::new(&wad, &String::from("E1M1")).unwrap());
+        let data_textures = Rc::new(DataTextures::new(&wad).unwrap());
         let surface = Rc::new(RefCell::new(
             DoomSurface::new(
                 PhysicalSize::<u32>::new(
@@ -60,6 +64,7 @@ impl<'wad> Doom<'wad> {
             // Logic
             input: WinitInputHelper::new(),
             map: map.clone(),
+            data_textures: data_textures.clone(),
             bsp: BSP::new(&map),
             actors: Doom::create_actors(&map, &configure),
             // Render
@@ -73,6 +78,13 @@ impl<'wad> Doom<'wad> {
                             software_3d.zw(),
                             software_3d.xy(),
                             &configure.camera
+                        )));
+                    }
+                    if let Some(flat_2d) = &render.flat_2d {
+                        renders.push(crea_render!(RenderFlats::new(
+                            &data_textures,
+                            flat_2d.zw(),
+                            flat_2d.xy(),
                         )));
                     }
                     if let Some(map_2d) = &render.map_2d {

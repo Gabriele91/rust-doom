@@ -72,6 +72,12 @@ impl Directory {
         let chunk_size = mem::size_of::<T>() as usize;
         (start..end).step_by(chunk_size)
     }
+
+    pub fn data_by_step<'a,T>(&self, offset: usize, step: usize) -> core::iter::StepBy<std::ops::Range<usize>> {
+        let start = self.lump_offset as usize + offset;
+        let end = start + self.lump_size as usize;
+        (start..end).step_by(step)
+    }
     
     pub fn name(&self) -> Result<String, std::string::FromUtf8Error> {
         match String::from_utf8(self.lump_name.to_vec())  {

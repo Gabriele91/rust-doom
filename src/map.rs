@@ -69,7 +69,6 @@ pub struct Seg {
     pub offset: u16,    // distance along linedef to start of seg
 }
 
-
 // Def a NodeBox
 pub type NodeBox = Vector4<i16>;
 
@@ -125,7 +124,7 @@ pub struct Map<'a> {
     pub segs: Vec<&'a Seg>,
     pub sectors: Vec<&'a Sector>,
     pub sub_sectors: Vec<&'a SubSector>,
-    pub nodes: Vec<&'a Node>,
+    pub nodes: Vec<&'a Node>
 }
 
 impl LineDef {
