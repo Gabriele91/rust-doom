@@ -67,14 +67,20 @@ impl std::fmt::Display for Directory {
 
 impl Directory {
     pub fn data<'a,T>(&self) -> core::iter::StepBy<std::ops::Range<usize>> {
-        let start = self.lump_offset as usize;
-        let end = start + self.lump_size as usize;
         let chunk_size = mem::size_of::<T>() as usize;
-        (start..end).step_by(chunk_size)
+        (self.start()..self.end()).step_by(chunk_size)
     }
 
     pub fn start(&self) -> usize {
         self.lump_offset as usize
+    }
+
+    pub fn size(&self) -> usize {
+        self.lump_size as usize
+    }
+
+    pub fn end(&self) -> usize {
+        self.start() + self.size()
     }
 
     pub fn data_by_step(&self, offset: usize, step: usize) -> core::iter::StepBy<std::ops::Range<usize>> {
@@ -111,7 +117,7 @@ impl<'a> DirectoryList<'a> {
     pub fn index_of(&self, name: &String) -> Option<usize> {
         for dir in self.into_iter().enumerate() {
             if let Ok(dir_name) = dir.1.name() {
-                if (*name) == dir_name {
+                if (*name).to_ascii_uppercase() == dir_name { // Case insensitive
                     return Some(dir.0);
                 }
             }
