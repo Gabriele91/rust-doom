@@ -335,10 +335,10 @@ pub mod render_2d {
         }
         fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<3>) {
             let start_y = self.offset.y as usize;
-            let end_y = ((self.offset.y + self.size.y) as usize).min(texture.size.height() as usize);
+            let end_y = ((self.offset.y + self.size.y) as usize).min(start_y + texture.size.height() as usize);
             
             let start_x = self.offset.x as usize;
-            let end_x = ((self.offset.x + self.size.x) as usize).min(texture.size.width() as usize);
+            let end_x = ((self.offset.x + self.size.x) as usize).min(start_x + texture.size.width() as usize);
             
             for y in start_y..end_y {
                 for x in start_x..end_x {
@@ -396,10 +396,10 @@ pub mod render_2d {
         }
         fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<4>) {
             let start_y = self.offset.y as usize;
-            let end_y = ((self.offset.y + self.size.y) as usize).min(texture.size.height() as usize);
+            let end_y = ((self.offset.y + self.size.y) as usize).min(start_y + texture.size.height() as usize);
             
             let start_x = self.offset.x as usize;
-            let end_x = ((self.offset.x + self.size.x) as usize).min(texture.size.width() as usize);
+            let end_x = ((self.offset.x + self.size.x) as usize).min(start_x + texture.size.width() as usize);
             
             for y in start_y..end_y {
                 for x in start_x..end_x {
