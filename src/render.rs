@@ -313,7 +313,7 @@ pub mod render_2d {
 
     }
 
-        // Render 2D map
+    // Render 2D flats
     #[derive(Clone)]
     pub struct RenderFlats<'wad> {
         data_textures: Rc<DataTextures<'wad>>,
@@ -353,7 +353,7 @@ pub mod render_2d {
         }
      }
 
-     impl crate::render::Render for RenderFlats<'_> {
+    impl crate::render::Render for RenderFlats<'_> {
         fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, _blending_factor: f64) {
             // Test
             if self.data_textures.flats.is_empty() {
@@ -371,6 +371,67 @@ pub mod render_2d {
             }
             // Draw
             self.draw_texture(&mut doom.surface.borrow_mut(), &self.data_textures.flats[self.flat_id]);
+        }
+    }
+
+    // Render 2D sprites
+    #[derive(Clone)]
+    pub struct RenderSprites<'wad> {
+        data_textures: Rc<DataTextures<'wad>>,
+        sprite_id: usize,
+        sprite_update: f64,
+        size: Vector2<i32>,
+        offset: Vector2<i32>,
+    }
+
+    impl<'wad> RenderSprites<'wad> {
+        pub fn new(data_textures:&Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+            RenderSprites {
+                data_textures: data_textures.clone(),
+                sprite_id: 0,
+                sprite_update: 0.0,
+                size: size,
+                offset: offset,
+            }
+        }
+        fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<4>) {
+            let start_y = self.offset.y as usize;
+            let end_y = ((self.offset.y + self.size.y) as usize).min(texture.size.height() as usize);
+            
+            let start_x = self.offset.x as usize;
+            let end_x = ((self.offset.x + self.size.x) as usize).min(texture.size.width() as usize);
+            
+            for y in start_y..end_y {
+                for x in start_x..end_x {
+                    let texture_x = x - start_x;
+                    let texture_y = y - start_y;
+                    surface.draw_lt(
+                        &Vector2::new(x, y), 
+                        &texture.colors[texture_y * texture.size.width() as usize + texture_x]
+                    );
+                }
+            }
+        }
+     }
+
+    impl crate::render::Render for RenderSprites<'_> {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, _blending_factor: f64) {
+            // Test
+            if self.data_textures.sprites.is_empty() {
+                return;
+            }
+            // Update
+            self.sprite_update += last_frame_time;
+            // Change Texture
+            if self.sprite_update >= 1.0  {
+                self.sprite_id += 1;
+                self.sprite_update = 0.0;
+                if  self.sprite_id >= self.data_textures.sprites.len() {
+                    self.sprite_id = 0;
+                }
+            }
+            // Draw
+            self.draw_texture(&mut doom.surface.borrow_mut(), &self.data_textures.sprites[self.sprite_id]);
         }
     }
 

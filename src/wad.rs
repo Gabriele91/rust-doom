@@ -73,7 +73,11 @@ impl Directory {
         (start..end).step_by(chunk_size)
     }
 
-    pub fn data_by_step<'a,T>(&self, offset: usize, step: usize) -> core::iter::StepBy<std::ops::Range<usize>> {
+    pub fn start(&self) -> usize {
+        self.lump_offset as usize
+    }
+
+    pub fn data_by_step(&self, offset: usize, step: usize) -> core::iter::StepBy<std::ops::Range<usize>> {
         let start = self.lump_offset as usize + offset;
         let end = start + self.lump_size as usize;
         (start..end).step_by(step)

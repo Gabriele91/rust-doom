@@ -30,6 +30,7 @@ pub struct Render {
     pub bsp_2d: Option<Vector4<i32>>, 
     pub camera_2d: Option<Vector4<i32>>, 
     pub flat_2d: Option<Vector4<i32>>, 
+    pub sprite_2d: Option<Vector4<i32>>, 
     pub software_3d: Option<Vector4<i32>>, 
 }
 
@@ -146,6 +147,7 @@ impl Render {
                 bsp_2d: Vector4::<i32>::from_optional_str(props.get("bsp_2d")),
                 camera_2d: Vector4::<i32>::from_optional_str(props.get("camera_2d")),
                 flat_2d: Vector4::<i32>::from_optional_str(props.get("flat_2d")),
+                sprite_2d: Vector4::<i32>::from_optional_str(props.get("sprite_2d")),
                 software_3d: Vector4::<i32>::from_optional_str(props.get("software_3d")),
             }),
             _ => None  
