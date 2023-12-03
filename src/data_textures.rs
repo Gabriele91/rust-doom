@@ -275,7 +275,9 @@ impl<'a> DataTextures<'a> {
                 data_textures.texture_patch_names = data_textures.extract::<PNames>(&directories, String::from("PNAMES"));
                 data_textures.texture_patches = data_textures.extract_texture_patches(&directories);
                 data_textures.texture_maps = data_textures.extract_texture_maps(&directories, String::from("TEXTURE1"));
-                // Build images:
+                // For standard doom
+                data_textures.texture_maps.extend(data_textures.extract_texture_maps(&directories, String::from("TEXTURE2")));
+                // Build images
                 if !data_textures.palettes.is_empty() {
                     data_textures.build_flats(&data_textures.palettes[0]);
                     data_textures.build_sprites(&data_textures.palettes[0]);
