@@ -13,6 +13,14 @@ pub struct Palette([[u8; 3]; 256]);
 
 #[repr(packed)]
 #[allow(dead_code)]
+#[readonly::make]
+pub struct PNames {
+    number_of_names: u32,
+    names: [[u8; 8]; 0]
+}
+
+#[repr(packed)]
+#[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
 pub struct RawFlats([u8; 64 * 64]);
@@ -111,7 +119,7 @@ pub struct DataTextures<'a> {
     pub sprite_patches: Vec<Patch<'a>>,
     pub sprites: Vec<Texture<4>>,
     // Texture (walls)
-    pub texture_patch_names: Vec<&'a [u8;8]>,
+    pub texture_patch_names: Option<&'a PNames>,
     pub texture_patches: Vec<Patch<'a>>,
     pub texture_maps: Vec<&'a TextureMap>,
     pub textures: Vec<Texture<4>>,
@@ -148,6 +156,21 @@ impl Index<usize> for Palette {
 
     fn index(&self, idx: usize) -> &Self::Output {
         &self.0[idx]
+    }
+}
+
+// Pnames
+impl PNames {
+    pub fn iter(&self) -> std::slice::Iter<'_,[u8; 8]> {
+        unsafe {
+            // Convert this struct into a array buffer
+            let names_ptr: *const [u8; 8] = mem::transmute(&self.names);
+            // Convert and jump first element (number_of_textures)
+            std::slice::from_raw_parts(
+                names_ptr, 
+                self.number_of_names as usize
+            ).iter()
+        }
     }
 }
 
@@ -235,7 +258,7 @@ impl<'a> DataTextures<'a> {
             sprite_patches: vec![], 
             sprites: vec![], 
             // Textures (walls)
-            texture_patch_names: vec![], 
+            texture_patch_names: None, 
             texture_patches: vec![],            
             texture_maps: vec![],
             textures: vec![], 
@@ -243,13 +266,13 @@ impl<'a> DataTextures<'a> {
         if let Some(directories) = data_textures.reader.directories() {
             if let Some(palettes_id) = directories.index_of(&String::from("PLAYPAL")) {
                 // Palettes
-                data_textures.palettes = data_textures.extract::<Palette>(&directories[palettes_id]);
+                data_textures.palettes = data_textures.extract_vec::<Palette>(&directories[palettes_id]);
                 // Flats
                 data_textures.raw_flats = data_textures.extract_a_set(&directories, String::from("F_START"), String::from("F_END"));
                 // Sprites
                 data_textures.sprite_patches = data_textures.extract_sprite_patches(&directories, String::from("S_START"), String::from("S_END"));
                 // Textures
-                data_textures.texture_patch_names = data_textures.extract_from_name::<[u8;8]>(&directories, String::from("PNAMES"));
+                data_textures.texture_patch_names = data_textures.extract::<PNames>(&directories, String::from("PNAMES"));
                 data_textures.texture_patches = data_textures.extract_texture_patches(&directories);
                 data_textures.texture_maps = data_textures.extract_texture_maps(&directories, String::from("TEXTURE1"));
                 // Build images:
@@ -266,7 +289,17 @@ impl<'a> DataTextures<'a> {
     }   
 
     // Basic
-    fn extract<T>(&self, directory: &wad::Directory) -> Vec<&'a T> {
+    fn extract<T>(&self, directories: &wad::DirectoryList, name: String) -> Option<&'a T> {
+        if let Some(directory_id) = directories.index_of(&name) {
+            let buffer = &self.reader.buffer;
+            let directory = directories[directory_id];
+            let value: &'a T = unsafe { mem::transmute(&buffer[directory.start()]) };
+            return Some(value);
+        }
+        return None;
+    }
+
+    fn extract_vec<T>(&self, directory: &wad::Directory) -> Vec<&'a T> {
         let buffer = &self.reader.buffer;
         let mut vec_t = vec![];   
         for chunk_offset in directory.data::<T>() {
@@ -275,14 +308,14 @@ impl<'a> DataTextures<'a> {
         }
         return vec_t;
     }
-     
-    fn extract_from_name<T>(&self, directories: &wad::DirectoryList, name: String) -> Vec<&'a T> {
+
+    fn extract_vec_from_name<T>(&self, directories: &wad::DirectoryList, name: String) -> Vec<&'a T> {
         let mut vec_t = vec![];   
         if let Some(directory_id) = directories.index_of(&name) {
             let directory = directories[directory_id];
             let buffer = &self.reader.buffer;
             for chunk_offset in directory.data::<T>() {
-                let value: &'a T = unsafe { mem::transmute(&buffer[chunk_offset + 4]) };
+                let value: &'a T = unsafe { mem::transmute(&buffer[chunk_offset]) };
                 vec_t.push(value);
             }
         }
@@ -294,7 +327,7 @@ impl<'a> DataTextures<'a> {
         if let Some(start_id) = directories.index_of(&start) {
             if let Some(end_id) = directories.index_of(&end) {
                 for id in start_id..=end_id {
-                    vec_t.extend(self.extract::<T>(&directories[id]));
+                    vec_t.extend(self.extract_vec::<T>(&directories[id]));
                 }
             }
         }
@@ -444,9 +477,11 @@ impl<'a> DataTextures<'a> {
 
     fn extract_texture_patches(&self, directories: &wad::DirectoryList) ->  Vec<Patch<'a>>  {
         let mut vec_t = vec![];   
-        for name in &self.texture_patch_names {
-            if let Some(patch) = self.extract_patch(directories, name) {
-                vec_t.push(patch);
+        if let Some(pnames) = self.texture_patch_names {
+            for name in pnames.iter() {
+                if let Some(patch) = self.extract_patch(directories, name) {
+                    vec_t.push(patch);
+                }
             }
         }
         vec_t
