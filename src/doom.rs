@@ -2,9 +2,8 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
-use crate::render::render_2d::{RenderFlats, RenderSprites, RenderTextures};
 use crate::render::{
-    render_2d::{RenderBSP, RenderCamera, RenderMap},
+    render_2d::{RenderBSP, RenderCamera, RenderMap, RenderTextures},
     render_3d::RenderSoftware,
     Render,
 };
@@ -83,20 +82,23 @@ impl<'wad> Doom<'wad> {
                     if let Some(sprite_2d) = &render.texture_2d {
                         renders.push(crea_render!(RenderTextures::new(
                             &data_textures,
+                            &data_textures.textures,
                             sprite_2d.zw(),
                             sprite_2d.xy(),
                         )));
                     }
                     if let Some(sprite_2d) = &render.sprite_2d {
-                        renders.push(crea_render!(RenderSprites::new(
+                        renders.push(crea_render!(RenderTextures::new(
                             &data_textures,
+                            &data_textures.sprites,
                             sprite_2d.zw(),
                             sprite_2d.xy(),
                         )));
                     }
                     if let Some(flat_2d) = &render.flat_2d {
-                        renders.push(crea_render!(RenderFlats::new(
+                        renders.push(crea_render!(RenderTextures::new(
                             &data_textures,
+                            &data_textures.flats,
                             flat_2d.zw(),
                             flat_2d.xy(),
                         )));

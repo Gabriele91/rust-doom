@@ -1,5 +1,11 @@
 // Global
-use std::{mem, mem::size_of, rc::Rc, ops::Index};
+use std::{
+    mem, 
+    mem::size_of, 
+    rc::Rc, 
+    ops::Index, 
+    cell::RefCell
+};
 
 // Engine
 use crate::wad::{self, Directory};
@@ -114,15 +120,15 @@ pub struct DataTextures<'a> {
     pub palettes: Vec<&'a Palette>,
     // Top/Bottom textures
     pub raw_flats: Vec<&'a RawFlats>,
-    pub flats: Vec< Texture<3> >,
+    pub flats: Rc<RefCell<Vec<Texture<3>>>>,
     // Sprites
     pub sprite_patches: Vec<Patch<'a>>,
-    pub sprites: Vec<Texture<4>>,
+    pub sprites: Rc<RefCell<Vec<Texture<4>>>>,
     // Texture (walls)
     pub texture_patch_names: Option<&'a PNames>,
     pub texture_patches: Vec<Patch<'a>>,
     pub texture_maps: Vec<&'a TextureMap>,
-    pub textures: Vec<Texture<4>>,
+    pub textures: Rc<RefCell<Vec<Texture<4>>>>,
 }
 
 // PatchName
@@ -253,15 +259,15 @@ impl<'a> DataTextures<'a> {
             palettes: vec![], 
             // Flats (bottom, top textures)
             raw_flats: vec![], 
-            flats: vec![], 
+            flats: Rc::new(RefCell::new(vec![])),
             // Sprites (player, gunes, items, etc...)
             sprite_patches: vec![], 
-            sprites: vec![], 
+            sprites:  Rc::new(RefCell::new(vec![])),
             // Textures (walls)
             texture_patch_names: None, 
             texture_patches: vec![],            
             texture_maps: vec![],
-            textures: vec![], 
+            textures: Rc::new(RefCell::new(vec![])),
         };
         if let Some(directories) = data_textures.reader.directories() {
             if let Some(palettes_id) = directories.index_of(&String::from("PLAYPAL")) {
@@ -338,10 +344,10 @@ impl<'a> DataTextures<'a> {
 
     // Flats
     fn build_flats(&mut self, palette: &Palette) {
-        self.flats.clear();
-        self.flats.reserve(self.raw_flats.len());
+        self.flats.as_ref().borrow_mut().clear();
+        self.flats.as_ref().borrow_mut().reserve(self.raw_flats.len());
         for ptexture in &self.raw_flats {
-            self.flats.push(
+            self.flats.as_ref().borrow_mut().push(
                 Texture {
                     size: Vector2::new(64, 64),
                     colors : {
@@ -418,9 +424,9 @@ impl<'a> DataTextures<'a> {
     }
 
     fn build_sprites(&mut self, palette: &Palette) {
-        self.sprites.reserve(self.sprite_patches.len());
+        self.sprites.as_ref().borrow_mut().reserve(self.sprite_patches.len());
         for patch in &self.sprite_patches {
-            self.sprites.push(self.build_patch_as_texture(patch, palette));
+            self.sprites.as_ref().borrow_mut().push(self.build_patch_as_texture(patch, palette));
         }
     }
 
@@ -510,8 +516,9 @@ impl<'a> DataTextures<'a> {
     }
 
     fn build_textures(&mut self) {
+        self.textures.as_ref().borrow_mut().reserve(self.texture_maps.len());
         for texture_map in &self.texture_maps {
-            self.textures.push(Texture {
+            self.textures.as_ref().borrow_mut().push(Texture {
                 size: Vector2::new(texture_map.size[0], texture_map.size[1]),
                 colors : {
                     // Texture

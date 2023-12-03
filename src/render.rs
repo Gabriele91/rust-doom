@@ -7,6 +7,7 @@ pub trait Render {
 }
 
 pub mod render_2d {
+    use std::cell::RefCell;
     use std::rc::Rc;
     // Use engine
     use crate::map::{Map, Vertex, NodeBox};
@@ -313,88 +314,29 @@ pub mod render_2d {
 
     }
 
-    // Render 2D flats
+    // Render 2D textures/sprites/flats
     #[derive(Clone)]
-    pub struct RenderFlats<'wad> {
+    pub struct RenderTextures<'wad, const C : usize> {
         data_textures: Rc<DataTextures<'wad>>,
-        flat_id: usize,
-        flat_update: f64,
+        textures: Rc<RefCell<Vec<Texture<C>>>>,
+        texture_id: usize,
+        texture_update: f64,
         size: Vector2<i32>,
         offset: Vector2<i32>,
     }
 
-    impl<'wad> RenderFlats<'wad> {
-        pub fn new(data_textures:&Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
-            RenderFlats {
+    impl<'wad, const C : usize> RenderTextures<'wad, C> {
+        pub fn new(data_textures:&Rc<DataTextures<'wad>>, textures: &Rc<RefCell<Vec<Texture<C>>>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+            RenderTextures {
                 data_textures: data_textures.clone(),
-                flat_id: 0,
-                flat_update: 0.0,
+                textures: textures.clone(),
+                texture_id: 0,
+                texture_update: 0.0,
                 size: size,
                 offset: offset,
             }
         }
-        fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<3>) {
-            let start_y = self.offset.y as usize;
-            let end_y = ((self.offset.y + self.size.y) as usize).min(start_y + texture.size.height() as usize);
-            
-            let start_x = self.offset.x as usize;
-            let end_x = ((self.offset.x + self.size.x) as usize).min(start_x + texture.size.width() as usize);
-            
-            for y in start_y..end_y {
-                for x in start_x..end_x {
-                    let texture_x = x - start_x;
-                    let texture_y = y - start_y;
-                    surface.draw_lt(
-                        &Vector2::new(x, y), 
-                        &texture.colors[texture_y * texture.size.width() as usize + texture_x]
-                    );
-                }
-            }
-        }
-     }
-
-    impl crate::render::Render for RenderFlats<'_> {
-        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, _blending_factor: f64) {
-            // Test
-            if self.data_textures.flats.is_empty() {
-                return;
-            }
-            // Update
-            self.flat_update += last_frame_time;
-            // Change Texture
-            if self.flat_update >= 1.0  {
-                self.flat_id += 1;
-                self.flat_update = 0.0;
-                if  self.flat_id >= self.data_textures.flats.len() {
-                    self.flat_id = 0;
-                }
-            }
-            // Draw
-            self.draw_texture(&mut doom.surface.borrow_mut(), &self.data_textures.flats[self.flat_id]);
-        }
-    }
-
-    // Render 2D sprites
-    #[derive(Clone)]
-    pub struct RenderSprites<'wad> {
-        data_textures: Rc<DataTextures<'wad>>,
-        sprite_id: usize,
-        sprite_update: f64,
-        size: Vector2<i32>,
-        offset: Vector2<i32>,
-    }
-
-    impl<'wad> RenderSprites<'wad> {
-        pub fn new(data_textures:&Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
-            RenderSprites {
-                data_textures: data_textures.clone(),
-                sprite_id: 0,
-                sprite_update: 0.0,
-                size: size,
-                offset: offset,
-            }
-        }
-        fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<4>) {
+        fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<C>) {
             let start_y = self.offset.y as usize;
             let end_y = ((self.offset.y + self.size.y) as usize).min(start_y + texture.size.height() as usize);
             
@@ -414,87 +356,26 @@ pub mod render_2d {
         }
     }
 
-    impl crate::render::Render for RenderSprites<'_> {
+    impl<const C : usize> crate::render::Render for RenderTextures<'_, C> {
         fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, _blending_factor: f64) {
             // Test
-            if self.data_textures.sprites.is_empty() {
+            if self.textures.borrow().is_empty() {
                 return;
             }
             // Update
-            self.sprite_update += last_frame_time;
+            self.texture_update += last_frame_time;
             // Change Texture
-            if self.sprite_update >= 1.0  {
-                self.sprite_id += 1;
-                self.sprite_update = 0.0;
-                if  self.sprite_id >= self.data_textures.sprites.len() {
-                    self.sprite_id = 0;
+            if self.texture_update >= 1.0  {
+                self.texture_id += 1;
+                self.texture_update = 0.0;
+                if  self.texture_id >= self.textures.borrow().len() {
+                    self.texture_id = 0;
                 }
             }
             // Draw
-            self.draw_texture(&mut doom.surface.borrow_mut(), &self.data_textures.sprites[self.sprite_id]);
+            self.draw_texture(&mut doom.surface.borrow_mut(), &self.textures.borrow()[self.texture_id]);
         }
     }
-
-        // Render 2D textures
-        #[derive(Clone)]
-        pub struct RenderTextures<'wad> {
-            data_textures: Rc<DataTextures<'wad>>,
-            texture_id: usize,
-            texture_update: f64,
-            size: Vector2<i32>,
-            offset: Vector2<i32>,
-        }
-    
-        impl<'wad> RenderTextures<'wad> {
-            pub fn new(data_textures:&Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
-                RenderTextures {
-                    data_textures: data_textures.clone(),
-                    texture_id: 0,
-                    texture_update: 0.0,
-                    size: size,
-                    offset: offset,
-                }
-            }
-            fn draw_texture(&self, surface: &mut DoomSurface, texture: &Texture<4>) {
-                let start_y = self.offset.y as usize;
-                let end_y = ((self.offset.y + self.size.y) as usize).min(start_y + texture.size.height() as usize);
-                
-                let start_x = self.offset.x as usize;
-                let end_x = ((self.offset.x + self.size.x) as usize).min(start_x + texture.size.width() as usize);
-                
-                for y in start_y..end_y {
-                    for x in start_x..end_x {
-                        let texture_x = x - start_x;
-                        let texture_y = y - start_y;
-                        surface.draw_lt(
-                            &Vector2::new(x, y), 
-                            &texture.colors[texture_y * texture.size.width() as usize + texture_x]
-                        );
-                    }
-                }
-            }
-        }
-    
-        impl crate::render::Render for RenderTextures<'_> {
-            fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, last_frame_time: f64, _blending_factor: f64) {
-                // Test
-                if self.data_textures.sprites.is_empty() {
-                    return;
-                }
-                // Update
-                self.texture_update += last_frame_time;
-                // Change Texture
-                if self.texture_update >= 1.0  {
-                    self.texture_id += 1;
-                    self.texture_update = 0.0;
-                    if  self.texture_id >= self.data_textures.textures.len() {
-                        self.texture_id = 0;
-                    }
-                }
-                // Draw
-                self.draw_texture(&mut doom.surface.borrow_mut(), &self.data_textures.textures[self.texture_id]);
-            }
-        }
 }
 
 pub mod render_3d {
