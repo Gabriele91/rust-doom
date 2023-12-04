@@ -8,7 +8,7 @@ use std::{
 };
 
 // Engine
-use crate::wad::{self, Directory};
+use crate::wad;
 use crate::math::Vector2;
 
 #[repr(packed)]
@@ -110,25 +110,30 @@ pub struct TextureHeader {
 }
 
 pub struct Texture<const C : usize> {
+    pub is_sky: bool,
     pub size: Vector2<u16>,
     pub colors: Vec<[u8; C]>
 }
+
+// Ref alias
+type RefCount<T> =  Rc<RefCell<T>>;
 
 pub struct DataTextures<'a> {
         reader: Rc<wad::Reader>,
     // Palette
     pub palettes: Vec<&'a Palette>,
     // Top/Bottom textures
-    pub raw_flats: Vec<&'a RawFlats>,
-    pub flats: Rc<RefCell<Vec<Texture<3>>>>,
+    pub flats_data: Vec<&'a RawFlats>,
+    pub flats_names: Vec<[u8; 8]>,
+    pub flats: Rc<RefCell<Vec<Rc<Texture<3>>>>>,
     // Sprites
     pub sprite_patches: Vec<Patch<'a>>,
-    pub sprites: Rc<RefCell<Vec<Texture<4>>>>,
+    pub sprites: Rc< RefCell< Vec< Rc< Texture<4> > > > >,
     // Texture (walls)
     pub texture_patch_names: Option<&'a PNames>,
     pub texture_patches: Vec<Patch<'a>>,
     pub texture_maps: Vec<&'a TextureMap>,
-    pub textures: Rc<RefCell<Vec<Texture<4>>>>,
+    pub textures: Rc< RefCell< Vec< Rc< Texture<4> > > > >,
 }
 
 // PatchName
@@ -258,7 +263,8 @@ impl<'a> DataTextures<'a> {
             reader: reader.clone(),
             palettes: vec![], 
             // Flats (bottom, top textures)
-            raw_flats: vec![], 
+            flats_data: vec![], 
+            flats_names: vec![],
             flats: Rc::new(RefCell::new(vec![])),
             // Sprites (player, gunes, items, etc...)
             sprite_patches: vec![], 
@@ -274,7 +280,8 @@ impl<'a> DataTextures<'a> {
                 // Palettes
                 data_textures.palettes = data_textures.extract_vec::<Palette>(&directories[palettes_id]);
                 // Flats
-                data_textures.raw_flats = data_textures.extract_a_set(&directories, String::from("F_START"), String::from("F_END"));
+                data_textures.flats_names = data_textures.extract_a_directories_names_set(&directories, String::from("F_START"), String::from("F_END"));
+                data_textures.flats_data = data_textures.extract_a_set(&directories, String::from("F_START"), String::from("F_END"));
                 // Sprites
                 data_textures.sprite_patches = data_textures.extract_sprite_patches(&directories, String::from("S_START"), String::from("S_END"));
                 // Textures
@@ -330,6 +337,18 @@ impl<'a> DataTextures<'a> {
         return vec_t;
     }
 
+    fn extract_a_directories_names_set(&self, directories: &wad::DirectoryList, start: String, end: String) -> Vec<[u8; 8]> {
+        let mut vec_t = vec![];   
+        if let Some(start_id) = directories.index_of(&start) {
+            if let Some(end_id) = directories.index_of(&end) {
+                for id in start_id..=end_id {
+                    vec_t.push(directories[id].lump_name.clone());
+                }
+            }
+        }
+        vec_t
+    }
+
     fn extract_a_set<T>(&self, directories: &wad::DirectoryList, start: String, end: String) -> Vec<&'a T> {
         let mut vec_t = vec![];   
         if let Some(start_id) = directories.index_of(&start) {
@@ -341,25 +360,32 @@ impl<'a> DataTextures<'a> {
         }
         vec_t
     }
-
     // Flats
     fn build_flats(&mut self, palette: &Palette) {
         self.flats.as_ref().borrow_mut().clear();
-        self.flats.as_ref().borrow_mut().reserve(self.raw_flats.len());
-        for ptexture in &self.raw_flats {
-            self.flats.as_ref().borrow_mut().push(
+        self.flats.as_ref().borrow_mut().reserve(self.flats_data.len());
+        for ptexture in &self.flats_data {
+            self.flats.as_ref().borrow_mut().push(Rc::new(
                 Texture {
+                    is_sky: false,
                     size: Vector2::new(64, 64),
-                    colors : {
+                    colors: {
                         ptexture.slices().iter().map(|id| (*palette)[(*id) as usize]).collect()
                     }
                 }
-            )
+            ))
         }
     }
 
+    pub fn flat(&self, name: &[u8; 8]) -> Option<Rc<Texture<3>>> {
+        if let Some(index) = self.flats_names.iter().position(|flats_name| **flats_name == *name) {
+            return Some(self.flats.as_ref().borrow()[index].clone());
+        }
+        None
+    }
+    
     // Sprite & Texture
-    fn patch_is_sky(pname: &[u8;8]) -> bool {
+    fn is_sky(pname: &[u8;8]) -> bool {
         match pname {
             // DOOM 1&2
             b"SKY\0\0\0\0\0" => true,
@@ -396,6 +422,7 @@ impl<'a> DataTextures<'a> {
 
     fn build_patch_as_texture(&self, patch: &Patch, palette: &Palette) -> Texture<4> {
         let texture = Texture {
+            is_sky: false,
             size: Vector2::new(patch.header.size[0], patch.header.size[1]),
             colors: {
                 let width = patch.header.size[0] as usize;
@@ -426,8 +453,15 @@ impl<'a> DataTextures<'a> {
     fn build_sprites(&mut self, palette: &Palette) {
         self.sprites.as_ref().borrow_mut().reserve(self.sprite_patches.len());
         for patch in &self.sprite_patches {
-            self.sprites.as_ref().borrow_mut().push(self.build_patch_as_texture(patch, palette));
+            self.sprites.as_ref().borrow_mut().push(Rc::new(self.build_patch_as_texture(patch, palette)));
         }
+    }
+
+    pub fn sprite(&self, name: &[u8; 8]) -> Option<Rc<Texture<4>>> {
+        if let Some(index) = self.sprite_patches.iter().position(|patch| patch.name == *name) {
+            return Some(self.sprites.as_ref().borrow()[index].clone());
+        }
+        None
     }
 
     // Textures
@@ -476,7 +510,7 @@ impl<'a> DataTextures<'a> {
                 name: name.clone(), 
                 header: header, 
                 content: content, 
-                is_sky: DataTextures::patch_is_sky(&name),
+                is_sky: DataTextures::is_sky(&name),
             };
             return Some(patch);
         }            
@@ -518,7 +552,8 @@ impl<'a> DataTextures<'a> {
     fn build_textures(&mut self) {
         self.textures.as_ref().borrow_mut().reserve(self.texture_maps.len());
         for texture_map in &self.texture_maps {
-            self.textures.as_ref().borrow_mut().push(Texture {
+            self.textures.as_ref().borrow_mut().push(Rc::new(Texture {
+                is_sky: DataTextures::is_sky(&texture_map.name),
                 size: Vector2::new(texture_map.size[0], texture_map.size[1]),
                 colors : {
                     // Texture
@@ -562,7 +597,15 @@ impl<'a> DataTextures<'a> {
                     }
                     texture_data
                 }
-            });
+            }));
         }
     }
+
+    pub fn texture(&self, name: &[u8; 8]) -> Option<Rc<Texture<4>>> {
+        if let Some(index) = self.texture_maps.iter().position(|map| map.name == *name) {
+            return Some(self.textures.as_ref().borrow()[index].clone());
+        }
+        None
+    }
+
 }

@@ -318,7 +318,7 @@ pub mod render_2d {
     #[derive(Clone)]
     pub struct RenderTextures<'wad, const C : usize> {
         data_textures: Rc<DataTextures<'wad>>,
-        textures: Rc<RefCell<Vec<Texture<C>>>>,
+        textures: Rc<RefCell<Vec<Rc<Texture<C>>>>>,
         texture_id: usize,
         texture_update: f64,
         size: Vector2<i32>,
@@ -326,7 +326,7 @@ pub mod render_2d {
     }
 
     impl<'wad, const C : usize> RenderTextures<'wad, C> {
-        pub fn new(data_textures:&Rc<DataTextures<'wad>>, textures: &Rc<RefCell<Vec<Texture<C>>>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+        pub fn new(data_textures:&Rc<DataTextures<'wad>>, textures: &Rc<RefCell<Vec<Rc<Texture<C>>>>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
             RenderTextures {
                 data_textures: data_textures.clone(),
                 textures: textures.clone(),
