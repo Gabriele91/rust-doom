@@ -372,8 +372,10 @@ pub mod render_2d {
                     self.texture_id = 0;
                 }
             }
+            // Textures
+            let textures: &Vec<Rc<Texture<C>>> = &*self.textures.borrow();
             // Draw
-            self.draw_texture(&mut doom.surface.borrow_mut(), &self.textures.borrow()[self.texture_id]);
+            self.draw_texture(&mut doom.surface.borrow_mut(), &textures[self.texture_id]);
         }
     }
 }
@@ -387,10 +389,11 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Seg};
-    use crate::math::Vector2;
+    use crate::map::{Map, Seg, LINEDEF_FLAGS};
+    use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
+    use crate::data_textures::{Texture, DataTextures};
 
     mod consts {
         pub const VOID_TEXTURE : [u8; 8] = ['-' as u8,0,0,0, 0,0,0,0];
@@ -407,6 +410,7 @@ pub mod render_3d {
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
         map: Rc<Map<'wad>>,
+        data_textures: Rc<DataTextures<'wad>>,
         size: Vector2<i32>,
         offset: Vector2<i32>,
         camera: Camera,
@@ -417,9 +421,10 @@ pub mod render_3d {
 
 
     impl<'wad> RenderSoftware<'wad> {
-        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
+        pub fn new(map: &Rc<Map<'wad>>, data_textures: &Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
             RenderSoftware {
                 map: map.clone(),
+                data_textures: data_textures.clone(),
                 size: size,
                 offset: offset,
                 camera: Camera::new(configure.fov, size.width().try_into().unwrap()),
@@ -461,6 +466,25 @@ pub mod render_3d {
             ]
         }
 
+        fn apply_light_to_color<'a, const C: usize>(rgba: &'a mut [u8; C], light_level: f32) -> &'a [u8] {
+            match C {
+                1 => {
+                    rgba[0] = (rgba[0] as f32 * light_level) as u8;
+                },
+                2 => {
+                    rgba[0] = (rgba[0] as f32 * light_level) as u8;
+                    rgba[1] = (rgba[1] as f32 * light_level) as u8;
+                },
+                3 | 4 => {
+                    rgba[0] = (rgba[0] as f32 * light_level) as u8;
+                    rgba[1] = (rgba[1] as f32 * light_level) as u8;
+                    rgba[2] = (rgba[2] as f32 * light_level) as u8;
+                },
+                _ => panic!("Unsupported"),
+            }
+            rgba
+        }
+        
         fn classify_segment(&self, seg: &'wad Seg, start: u32, end: u32) -> Option<WallType<'wad>> {
             if start == end {
                 return None;
@@ -505,6 +529,35 @@ pub mod render_3d {
                 surface.draw_line_lt(&start, &end, &color);
             }
         }
+        
+        fn draw_line_texture<const C: usize>(
+            &self, 
+            surface: &mut DoomSurface, 
+            mut x: i32, 
+            mut y1: i32,
+            mut y2: i32, 
+            mut u: u16, 
+            texture_alt: i16, 
+            inv_scale: f32,
+            tex: &Texture<C>,
+            light_level: f32) 
+        {
+            u = u % tex.size.x;
+            if x < self.size.x && y1 < y2 {
+                x += self.offset.x;
+                y1 += self.offset.y;
+                y2 += self.offset.y;
+                let mut v: f32 = texture_alt as f32 + ((y1 as f32 - (surface.size.height as f32 / 2.0)) * inv_scale);
+                for y in y1..y2 {
+                    let mut color = tex.get(u, v as u16 % tex.size.y).clone();
+                    surface.draw_lt(
+                    &Vector2::new(x as usize, y as usize), 
+                    RenderSoftware::apply_light_to_color(&mut color, light_level)
+                    );
+                    v += inv_scale;
+                }
+            }
+        }
 
         fn draw_wall(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
             match wtype {
@@ -515,17 +568,20 @@ pub mod render_3d {
                     let side = line.right_side(&self.map).unwrap();
                     let sector = seg.right_sector(&self.map).unwrap();
                     let angle = actor.angle() as f32;
+                    let height = *actor.height();
                     let position = Vector2::<f32>::from( actor.position() );
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.size.height() as f32 / 2.0;
                     // Texture
-                    let wall_texture = side.middle_texture;
-                    let floor_texture = sector.floor_texture;
-                    let ceiling_texture = sector.ceiling_texture;
+                    let wall_texture_name = side.middle_texture;
+                    let floor_texture_name = sector.floor_texture;
+                    let ceiling_texture_name = sector.ceiling_texture;
                     let light_level = math::clamp( sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    // Get texture
+                    let wall_texture = self.data_textures.texture(&wall_texture_name).unwrap();
                     // Height of wall w/ rispect to player
-                    let wall_floor = sector.floor_height - *actor.height();
-                    let wall_ceiling = sector.ceiling_height - *actor.height();
+                    let wall_floor = sector.floor_height - height;
+                    let wall_ceiling = sector.ceiling_height - height;
                     // What to draw
                     let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
                     let b_draw_ceiling = wall_ceiling > 0;
@@ -539,6 +595,10 @@ pub mod render_3d {
                     let offset_angle = wall_normal_angle - wall_angle;
                     let hypotenuse = position.distance(&start_vertex);
                     let wall_distance = hypotenuse * math::radians(offset_angle).cos();
+                    // Determine how the wall textures are horizontally aligned
+                    let mut wall_offset = hypotenuse * math::radians(offset_angle).sin();
+                    wall_offset += seg.offset as f32 + side.offset.x as f32;
+                    let wall_center_angle = wall_normal_angle - angle;
                     // Compute scale
                     let wall_scale_1 = math::clamp(
                         self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
@@ -557,6 +617,14 @@ pub mod render_3d {
                             0.0
                         }
                     };
+                    // Texture height
+                    let middle_texture_alt = {
+                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                            sector.floor_height + wall_texture.size.y as i16 - height + side.offset.y  
+                        } else {
+                            wall_ceiling + side.offset.y  
+                        }
+                    };
                     // Determine where on the screen the wall is drawn
                     // Top wall
                     let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale_1;
@@ -564,7 +632,13 @@ pub mod render_3d {
                     // Bottom wall
                     let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
                     let wall_y2_step = -wall_scale_step * wall_floor as f32;
-
+                    /* 
+                    println!("start {}, end {}, wall center {} ({}, {}), wall dist {}", 
+                                start, end, 
+                                wall_center_angle, wall_normal_angle, angle, 
+                                wall_distance
+                            );
+                    */
                     // Draw
                     for x in start..end {
                         let draw_wall_y1 = wall_y1 as i32;
@@ -577,19 +651,38 @@ pub mod render_3d {
                                 x as i32, 
                                 ceiling_wall_y1, 
                                 ceiling_wall_y2, 
-                                &RenderSoftware::name_to_color(&ceiling_texture, &light_level)
+                                &RenderSoftware::name_to_color(&ceiling_texture_name, &light_level)
                             );
                         }
                         if b_draw_wall {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
+
+                            if middle_wall_y1 < middle_wall_y2 {
+                                let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
+                                let u = wall_distance * radians(wall_angle).tan() - wall_offset;
+                                let inv_scale = 1.0 / wall_scale_1;
+                                self.draw_line_texture(
+                                    surface, 
+                                    x as i32, 
+                                    middle_wall_y1, 
+                                    middle_wall_y2, 
+                                    u as u16, 
+                                    middle_texture_alt, 
+                                    inv_scale, 
+                                    wall_texture.as_ref(), 
+                                    light_level
+                                );
+                            }
+                            /*
                             self.draw_line(
                                 surface, 
                                 x as i32, 
                                 middle_wall_y1, 
                                 middle_wall_y2, 
-                                &RenderSoftware::name_to_color(&wall_texture, &light_level)
+                                &RenderSoftware::name_to_color(&wall_texture_name, &light_level)
                             );
+                            */
                         }
                         if b_draw_floor {
                             let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
@@ -599,7 +692,7 @@ pub mod render_3d {
                                 x as i32, 
                                 floor_wall_y1, 
                                 floor_wall_y2, 
-                                &RenderSoftware::name_to_color(&floor_texture, &light_level)
+                                &RenderSoftware::name_to_color(&floor_texture_name, &light_level)
                             );
                         }
                         // Next step
@@ -616,6 +709,7 @@ pub mod render_3d {
                     let left_sector = seg.left_sector(&self.map).unwrap();
                     let angle = actor.angle() as f32;
                     let position = Vector2::<f32>::from( actor.position() );
+                    let height = *actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = (self.size.height() / 2) as f32;
                     // Texture
@@ -626,10 +720,10 @@ pub mod render_3d {
                     let ceiling_texture = right_sector.ceiling_texture;
                     let light_level = math::clamp( right_sector.light_level as f32 / 255.0, 0.0, 1.0);
                     // Height of wall w/ rispect to player
-                    let right_wall_floor = right_sector.floor_height - *actor.height();
-                    let right_wall_ceiling = right_sector.ceiling_height - *actor.height();
-                    let left_wall_floor = left_sector.floor_height - *actor.height();
-                    let left_wall_ceiling = left_sector.ceiling_height - *actor.height();
+                    let right_wall_floor = right_sector.floor_height - height;
+                    let right_wall_ceiling = right_sector.ceiling_height - height;
+                    let left_wall_floor = left_sector.floor_height - height;
+                    let left_wall_ceiling = left_sector.ceiling_height - height;
                     // set what to draw
                     let mut b_draw_upper_wall = false;
                     let mut b_draw_ceiling = false;
@@ -799,7 +893,7 @@ pub mod render_3d {
             }
         }
 
-        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, wall_x_start: u32, wall_x_end: u32, raw_angle: f32) -> bool {
+        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -816,7 +910,7 @@ pub mod render_3d {
                     xe += 1;
                 }
                 if (xe - xs) > 0 {
-                    self.draw_wall(actor, surface, wtype, xs, xe, raw_angle);
+                    self.draw_wall(actor, surface, wtype, xs, xe, wall_angle);
                     xs = xe + 1;
                 } else {
                     break;
@@ -846,9 +940,9 @@ pub mod render_3d {
                             let seg = render.map.segs[sector_id as usize];
                             let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
                             let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
-                            if let Some((x1,x2, raw_angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
+                            if let Some((x1,x2, wall_angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
                                if let Some(wtype) = render.classify_segment(&seg, x1, x2){
-                                    render.draw_clip_walls(&actor.borrow(),&mut surface.borrow_mut(), &wtype, x1,  x2, raw_angle);
+                                    render.draw_clip_walls(&actor.borrow(), &mut surface.borrow_mut(), &wtype, x1,  x2, wall_angle);
                                }
                             }                               
                         }

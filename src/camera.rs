@@ -19,7 +19,7 @@ impl Camera {
     pub fn new(fov: f32, width: u32) -> Self {
         let half_fov = fov / 2.0;
         let half_width = width / 2;
-        let screen_dist = half_width as f32 / radians(fov / 2.0).tan();
+        let screen_dist = half_width as f32 / radians(half_fov).tan();
         Camera {
             fov,
             half_fov,
@@ -168,8 +168,8 @@ impl Camera {
         let fangle = actor.angle() as f32;
         let mut segment_angle1 = degrees(angle(&fpos, &fv1));
         let mut segment_angle2 = degrees(angle(&fpos, &fv2));
-        // Save raw angle
-        let raw_angle1 = segment_angle1;
+        // Save wall angle
+        let wall_angle1 = segment_angle1;
         // Span 0
         let span0: f32 = normalize_degrees(segment_angle1 - segment_angle2);
         // Test 1
@@ -203,7 +203,7 @@ impl Camera {
         return Some((
             self.angle_to_x(segment_angle1),
             self.angle_to_x(segment_angle2),
-            raw_angle1,
+            wall_angle1,
         ));
     }
 }

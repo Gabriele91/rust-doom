@@ -256,6 +256,13 @@ impl TextureMap {
     }
 }
 
+// Texture
+impl<const C: usize> Texture<C> {
+    pub fn get(&self, x: u16, y: u16) -> &[u8; C] {
+        &self.colors[(self.size.x * y + x) as usize]
+    }
+}
+
 // Implement DataTextures
 impl<'a> DataTextures<'a> {
     pub fn new(reader: &Rc<wad::Reader>) -> Option<Self> {
@@ -378,7 +385,7 @@ impl<'a> DataTextures<'a> {
     }
 
     pub fn flat(&self, name: &[u8; 8]) -> Option<Rc<Texture<3>>> {
-        if let Some(index) = self.flats_names.iter().position(|flats_name| **flats_name == *name) {
+        if let Some(index) = self.flats_names.iter().position(|flats_name| *flats_name == *name) {
             return Some(self.flats.as_ref().borrow()[index].clone());
         }
         None

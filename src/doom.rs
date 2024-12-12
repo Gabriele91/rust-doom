@@ -74,6 +74,7 @@ impl<'wad> Doom<'wad> {
                     if let Some(software_3d) = &render.software_3d {
                         renders.push(crea_render!(RenderSoftware::new(
                             &map,
+                            &data_textures,
                             software_3d.zw(),
                             software_3d.xy(),
                             &configure.camera

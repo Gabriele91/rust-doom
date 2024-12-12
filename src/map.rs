@@ -100,6 +100,7 @@ pub struct Sector {
 }
 
 #[allow(dead_code)]
+#[repr(usize)]
 pub enum MAPLUMPSINDEX {
     THINGS = 1,
     LINEDEFS = 2,
@@ -114,6 +115,19 @@ pub enum MAPLUMPSINDEX {
     COUNT = 11
 }
 
+#[repr(u16)]
+pub enum LINEDEF_FLAGS {
+    BLOCKING = 1, 
+    BLOCK_MONSTERS = 2, 
+    TWO_SIDED = 4, 
+    DONT_PEG_TOP = 8,
+    DONT_PEG_BOTTOM = 16, 
+    SECRET = 32, 
+    SOUND_BLOCK = 64, 
+    DONT_DRAW = 128, 
+    MAPPED = 256
+}
+
 #[derive(Clone)]
 pub struct Map<'a> {
         reader: Rc<wad::Reader>,
@@ -125,6 +139,18 @@ pub struct Map<'a> {
     pub sectors: Vec<&'a Sector>,
     pub sub_sectors: Vec<&'a SubSector>,
     pub nodes: Vec<&'a Node>
+}
+
+impl LINEDEF_FLAGS {
+    pub fn value(self) -> u16 {
+        self as u16
+    }
+}
+
+impl MAPLUMPSINDEX {
+    pub fn value(self) -> usize {
+        self as usize
+    }
 }
 
 impl LineDef {
