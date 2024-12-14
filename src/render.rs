@@ -928,15 +928,6 @@ pub mod render_3d {
                                     );
                                 }
                             }
-                            /*
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                middle_wall_y1, 
-                                middle_wall_y2, 
-                                &RenderSoftware::name_to_color(&lower_texture_name, &light_level)
-                            );
-                            */
                             if self.lower_clip[x as usize] > middle_wall_y1 {
                                 self.lower_clip[x as usize] = middle_wall_y1
                             }
