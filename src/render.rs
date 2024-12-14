@@ -547,7 +547,7 @@ pub mod render_3d {
                 x += self.offset.x;
                 y1 += self.offset.y;
                 y2 += self.offset.y;
-                let mut v: f32 = texture_alt as f32 + ((y1 as f32 - (surface.size.height as f32 / 2.0)) * inv_scale);
+                let mut v: f32 = texture_alt as f32 + ((y1 as f32 - (self.size.y as f32 / 2.0)) * inv_scale);
                 for y in y1..y2 {
                     let mut color = tex.get(u, v as u16 % tex.size.y).clone();
                     surface.draw_lt(
@@ -632,13 +632,8 @@ pub mod render_3d {
                     // Bottom wall
                     let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
                     let wall_y2_step = -wall_scale_step * wall_floor as f32;
-                    /* 
-                    println!("start {}, end {}, wall center {} ({}, {}), wall dist {}", 
-                                start, end, 
-                                wall_center_angle, wall_normal_angle, angle, 
-                                wall_distance
-                            );
-                    */
+                    // Texture scale
+                    let mut wall_tex_y_scale = wall_scale_1;
                     // Draw
                     for x in start..end {
                         let draw_wall_y1 = wall_y1 as i32;
@@ -657,11 +652,10 @@ pub mod render_3d {
                         if b_draw_wall {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
-
                             if middle_wall_y1 < middle_wall_y2 {
                                 let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
                                 let u = wall_distance * radians(wall_angle).tan() - wall_offset;
-                                let inv_scale = 1.0 / wall_scale_1;
+                                let inv_scale =  1.0 / wall_tex_y_scale;
                                 self.draw_line_texture(
                                     surface, 
                                     x as i32, 
@@ -674,15 +668,7 @@ pub mod render_3d {
                                     light_level
                                 );
                             }
-                            /*
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                middle_wall_y1, 
-                                middle_wall_y2, 
-                                &RenderSoftware::name_to_color(&wall_texture_name, &light_level)
-                            );
-                            */
+                            
                         }
                         if b_draw_floor {
                             let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
@@ -696,6 +682,7 @@ pub mod render_3d {
                             );
                         }
                         // Next step
+                        wall_tex_y_scale += wall_scale_step;
                         wall_y1 += wall_y1_step;
                         wall_y2 += wall_y2_step;
                     }

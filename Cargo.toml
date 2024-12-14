@@ -2,23 +2,24 @@
 name = "rust-doom"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.69.0"
+rust-version = "1.83.0"
 
 [dependencies]
-lazy_static = "1.4"
-num-traits = "0.2"
+lazy_static = "1.5.0"
+num-traits = "0.2.19"
 pixels = "0.13"
 raw-window-handle = "0.5" #Pixes does not support 0.6 
 winit = { version = "0.29", default-features = false, features = ["rwh_05", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"] }
 winit_input_helper = "0.15"
-readonly = "0.2.11"
-rust-ini = "0.20.0"
+readonly = "0.2.12"
+rust-ini = "0.21.1"
 
 [build]
 rustflags = ["-Z", "threads=8"]
 
 [profile.dev]
 opt-level = 0
+debug = true
 
 [profile.release]
 opt-level = 3

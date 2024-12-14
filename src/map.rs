@@ -2,8 +2,13 @@
 use std::ops::Range;
 use std::{mem, vec};
 use std::rc::Rc;
-use crate::math::{Vector2, Vector4, normalize_degrees};
+use lazy_static::lazy_static;
+
+use crate::math::{Vector2, Vector4};
 use crate::wad;
+
+// Consts
+const DOOM_BAM_SCALE : f64 = 360.0 / 4294967296.0; // 8.38190317e-8
 
 #[repr(packed)]
 #[allow(dead_code)]
@@ -116,6 +121,7 @@ pub enum MAPLUMPSINDEX {
 }
 
 #[repr(u16)]
+#[warn(non_camel_case_types)]
 pub enum LINEDEF_FLAGS {
     BLOCKING = 1, 
     BLOCK_MONSTERS = 2, 
@@ -231,10 +237,18 @@ impl Seg {
     }
 
     pub fn float_degrees_angle(&self) -> f32 {
-        let angle = ((self.angle as u64) << 16) as f64 * 8.38190317e-8;
-        normalize_degrees(angle) as f32
+        // Conver to i32
+        let mut angle_i32: i32 = self.angle as i32;
+        angle_i32 <<= 16;
+        // Compute degrees angle
+        let mut angle_f64 = angle_i32 as f64 * DOOM_BAM_SCALE;
+        // [-180,180] -> [0,360]
+        if angle_f64 < 0.0 {
+            angle_f64 += 360.0;
+        }
+        // Returns
+        angle_f64 as f32
     }
-
 }
 
 impl<'a> Map<'a> {
