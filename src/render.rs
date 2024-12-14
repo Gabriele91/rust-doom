@@ -586,19 +586,16 @@ pub mod render_3d {
                     let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
                     let b_draw_ceiling = wall_ceiling > 0;
                     let b_draw_floor = wall_floor < 0;
+                    // Calculate the scaling factors of the left and right edges of the wall range
+                    let wall_normal_angle = seg.float_degrees_angle() + 90.0;
+                    let offset_angle = wall_normal_angle - wall_angle;
+                    // Wall distance
+                    let hypotenuse = position.distance(&start_vertex);
+                    let wall_distance = hypotenuse * math::radians(offset_angle).cos();
                     // Test
                     if !b_draw_wall && !b_draw_ceiling && !b_draw_floor {
                         return;
                     }
-                    // Calculate the scaling factors of the left and right edges of the wall range
-                    let wall_normal_angle = seg.float_degrees_angle() + 90.0;
-                    let offset_angle = wall_normal_angle - wall_angle;
-                    let hypotenuse = position.distance(&start_vertex);
-                    let wall_distance = hypotenuse * math::radians(offset_angle).cos();
-                    // Determine how the wall textures are horizontally aligned
-                    let mut wall_offset = hypotenuse * math::radians(offset_angle).sin();
-                    wall_offset += seg.offset as f32 + side.offset.x as f32;
-                    let wall_center_angle = wall_normal_angle - angle;
                     // Compute scale
                     let wall_scale_1 = math::clamp(
                         self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
@@ -617,14 +614,22 @@ pub mod render_3d {
                             0.0
                         }
                     };
+                    //////////////////////////////////////////////////////////////////////////////
+                    // Determine how the wall textures are horizontally aligned
+                    let mut wall_offset = hypotenuse * math::radians(offset_angle).sin();
+                    wall_offset += seg.offset as f32 + side.offset.x as f32;
+                    let wall_center_angle = wall_normal_angle - angle;
                     // Texture height
                     let middle_texture_alt = {
                         if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
-                            sector.floor_height + wall_texture.size.y as i16 - height + side.offset.y  
+                            wall_floor + wall_texture.size.y as i16 + side.offset.y  
                         } else {
                             wall_ceiling + side.offset.y  
                         }
                     };
+                    // Texture scale
+                    let mut wall_tex_y_scale = wall_scale_1;
+                    //////////////////////////////////////////////////////////////////////////////
                     // Determine where on the screen the wall is drawn
                     // Top wall
                     let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale_1;
@@ -632,8 +637,6 @@ pub mod render_3d {
                     // Bottom wall
                     let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
                     let wall_y2_step = -wall_scale_step * wall_floor as f32;
-                    // Texture scale
-                    let mut wall_tex_y_scale = wall_scale_1;
                     // Draw
                     for x in start..end {
                         let draw_wall_y1 = wall_y1 as i32;
@@ -700,9 +703,8 @@ pub mod render_3d {
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = (self.size.height() / 2) as f32;
                     // Texture
-                    let upper_texture = side.upper_texture;
-                    let lower_texture = side.lower_texture;
-                    let _wall_texture = side.middle_texture;
+                    let upper_texture_name = side.upper_texture;
+                    let lower_texture_name = side.lower_texture;
                     let floor_texture = right_sector.floor_texture;
                     let ceiling_texture = right_sector.ceiling_texture;
                     let light_level = math::clamp( right_sector.light_level as f32 / 255.0, 0.0, 1.0);
@@ -720,23 +722,27 @@ pub mod render_3d {
                     if right_wall_ceiling != left_wall_ceiling 
                     || right_sector.light_level != left_sector.light_level 
                     || right_sector.ceiling_texture != left_sector.ceiling_texture {
-                        b_draw_upper_wall = upper_texture != consts::VOID_TEXTURE && left_wall_ceiling < right_wall_ceiling;
+                        b_draw_upper_wall = upper_texture_name != consts::VOID_TEXTURE && left_wall_ceiling < right_wall_ceiling;
                         b_draw_ceiling = right_wall_ceiling >= 0;
                     }
 
                     if right_wall_floor != left_wall_floor 
                     || right_sector.light_level != left_sector.light_level 
                     || right_sector.floor_texture != left_sector.floor_texture {
-                        b_draw_lower_wall = lower_texture != consts::VOID_TEXTURE && left_wall_floor > right_wall_floor;
+                        b_draw_lower_wall = lower_texture_name != consts::VOID_TEXTURE && left_wall_floor > right_wall_floor;
                         b_draw_floor = right_wall_floor <= 0;
                     }
                     // Test
                     if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
                         return;
                     }
+                    // Get texture
+                    let upper_texture = self.data_textures.texture(&upper_texture_name).clone();
+                    let lower_texture = self.data_textures.texture(&lower_texture_name).clone();
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
                     let offset_angle = wall_normal_angle - wall_angle;
+                    // Wall distance
                     let hypotenuse = position.distance(&start_vertex);
                     let wall_distance = hypotenuse * math::radians(offset_angle).cos();
                     // Compute scale
@@ -756,7 +762,50 @@ pub mod render_3d {
                         } else {
                             0.0
                         }
+                    };                    
+                    //////////////////////////////////////////////////////////////////////////////
+                    // Determine how the wall textures are horizontally aligned
+                    struct TextureDrawData 
+                    {
+                        wall_offset: f32,
+                        wall_center_angle: f32,
+                        upper_texture_alt: i16,
+                        lower_texture_alt: i16
+                    }
+                    let texture_draw_data = {
+                        if !b_draw_upper_wall && !b_draw_lower_wall {
+                            TextureDrawData {
+                                wall_offset: 0.0,
+                                wall_center_angle: 0.0,
+                                upper_texture_alt: 0,
+                                lower_texture_alt: 0
+                            }
+                        }
+                        else {
+                            TextureDrawData {
+                                wall_offset: hypotenuse * math::radians(offset_angle).sin(),
+                                wall_center_angle:  wall_normal_angle - angle + (seg.offset as f32) + (side.offset.x as f32),
+                                upper_texture_alt: {
+                                    if b_draw_upper_wall && (line.flag & LINEDEF_FLAGS::DONT_PEG_TOP.value()) != 0 {
+                                        right_wall_ceiling + side.offset.y
+                                    } else if b_draw_upper_wall {
+                                        left_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y  
+                                    } else {
+                                        0i16
+                                    }
+                                },
+                                lower_texture_alt: {
+                                    if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                                        right_wall_ceiling + side.offset.y
+                                    } else {
+                                        left_wall_ceiling + side.offset.y  
+                                    }
+                                }
+                            }
+                        }
                     };
+                    // Texture scale
+                    let mut wall_tex_y_scale = wall_scale_1;
                     // Determine where on the screen the wall is drawn
                     // Top wall
                     let mut wall_y1 = half_height - right_wall_ceiling as f32 * wall_scale_1;
@@ -782,6 +831,16 @@ pub mod render_3d {
                     for x in start..end {
                         let draw_wall_y1 = wall_y1 as i32;
                         let draw_wall_y2 = wall_y2 as i32;
+                        let (draw_texture_column, inv_tex_scale) = {
+                            if b_draw_upper_wall || b_draw_lower_wall {
+                                let wall_angle = texture_draw_data.wall_center_angle - self.camera.x_to_angle(x);
+                                let draw_texture_column = (wall_distance * radians(wall_angle).tan() - texture_draw_data.wall_offset) as u16;
+                                (draw_texture_column, 1.0 / wall_tex_y_scale)
+                            } else {
+                                (0,0.0)
+                            }
+                        };
+
 
                         if b_draw_upper_wall {
                             if b_draw_ceiling {
@@ -800,13 +859,22 @@ pub mod render_3d {
 
                             let middle_wall_y1 = math::max(draw_upper_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_upper_wall_y2, self.lower_clip[x as usize]);
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                middle_wall_y1, 
-                                middle_wall_y2, 
-                                &RenderSoftware::name_to_color(&upper_texture, &light_level)
-                            );
+
+                            if middle_wall_y1 < middle_wall_y2 {
+                                if let Some(ref texture) = upper_texture {                                
+                                    self.draw_line_texture(
+                                        surface, 
+                                        x as i32, 
+                                        middle_wall_y1, 
+                                        middle_wall_y2, 
+                                        draw_texture_column, 
+                                        texture_draw_data.upper_texture_alt, 
+                                        inv_tex_scale, 
+                                        texture.as_ref(), 
+                                        light_level
+                                    );
+                                }
+                            }
                             if self.upper_clip[x as usize] < middle_wall_y2 {
                                 self.upper_clip[x as usize] = middle_wall_y2
                             }
@@ -843,15 +911,32 @@ pub mod render_3d {
                             let draw_lower_wall_y1 = portal_y2 as i32 - 1;
                             let draw_lower_wall_y2 = wall_y2 as i32;
 
-                            let middle_wall_y1 =  math::max(draw_lower_wall_y1, self.upper_clip[x as usize]);
+                            let middle_wall_y1 = math::max(draw_lower_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_lower_wall_y2, self.lower_clip[x as usize]);
+                            if middle_wall_y1 < middle_wall_y2 {
+                                if let Some(ref texture) = lower_texture {                                
+                                    self.draw_line_texture(
+                                        surface, 
+                                        x as i32, 
+                                        middle_wall_y1, 
+                                        middle_wall_y2, 
+                                        draw_texture_column, 
+                                        texture_draw_data.lower_texture_alt, 
+                                        inv_tex_scale, 
+                                        texture.as_ref(), 
+                                        light_level
+                                    );
+                                }
+                            }
+                            /*
                             self.draw_line(
                                 surface, 
                                 x as i32, 
                                 middle_wall_y1, 
                                 middle_wall_y2, 
-                                &RenderSoftware::name_to_color(&lower_texture, &light_level)
+                                &RenderSoftware::name_to_color(&lower_texture_name, &light_level)
                             );
+                            */
                             if self.lower_clip[x as usize] > middle_wall_y1 {
                                 self.lower_clip[x as usize] = middle_wall_y1
                             }
@@ -873,6 +958,7 @@ pub mod render_3d {
                             }
                         }
                         // Next step
+                        wall_tex_y_scale += wall_scale_step;
                         wall_y1 += wall_y1_step;
                         wall_y2 += wall_y2_step;
                     }
