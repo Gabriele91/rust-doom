@@ -139,7 +139,7 @@ impl<'wad> Doom<'wad> {
     }
 
     pub fn draw(&mut self, last_frame_time: f64, blending_factor: f64) {
-        self.surface.borrow_mut().clear([0, 0, 0, 0]);
+        self.surface.borrow_mut().clear([0, 0, 0, 0xff]);
         for render_id in 0..self.renders.len() {
             let render = self.renders[render_id].clone();
             render.borrow_mut().draw(self, last_frame_time, blending_factor);

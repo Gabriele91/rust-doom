@@ -263,6 +263,33 @@ impl<const C: usize> Texture<C> {
     }
 }
 
+// Test if the sprite or texture is a sky
+pub fn is_sky_texture(pname: &[u8;8]) -> bool {
+    match pname {
+        // DOOM 1&2
+        b"SKY\0\0\0\0\0" => true,
+        b"SKY1\0\0\0\0" => true,
+        b"SKY2\0\0\0\0" => true,
+        b"SKY3\0\0\0\0" => true,
+        b"SKY4\0\0\0\0" => true,
+        // Heretic
+        b"SKY5\0\0\0\0" => true,
+        // OLD TEX NAME
+        b"F_SKY\0\0\0" => true,
+        b"F_SKY1\0\0" => true,
+        b"F_SKY2\0\0" => true,
+        b"F_SKY3\0\0" => true,
+        b"F_SKY4\0\0" => true,
+        b"F_SKY5\0\0" => true,
+        // Hexen
+        b"SKYFOG\0\0" => true,
+        b"SKYFOG2\0" => true,
+        b"SKYWALL\0" => true,
+        b"SKYWALL2" => true,
+        _ => pname.starts_with(b"SKY")
+    }    
+}
+
 // Implement DataTextures
 impl<'a> DataTextures<'a> {
     pub fn new(reader: &Rc<wad::Reader>) -> Option<Self> {
@@ -390,27 +417,7 @@ impl<'a> DataTextures<'a> {
         }
         None
     }
-    
-    // Sprite & Texture
-    fn is_sky(pname: &[u8;8]) -> bool {
-        match pname {
-            // DOOM 1&2
-            b"SKY\0\0\0\0\0" => true,
-            b"SKY1\0\0\0\0" => true,
-            b"SKY2\0\0\0\0" => true,
-            b"SKY3\0\0\0\0" => true,
-            b"SKY4\0\0\0\0" => true,
-            // Heretic
-            b"SKY5\0\0\0\0" => true,
-            // Hexen
-            b"SKYFOG\0\0" => true,
-            b"SKYFOG2\0" => true,
-            b"SKYWALL\0" => true,
-            b"SKYWALL2" => true,
-            _ => false
-        }
-    }
-    
+        
     // Sprites
     fn extract_sprite_patches(&self, directories: &wad::DirectoryList, start: String, end: String) ->  Vec<Patch<'a>>  {
         let mut vec_t = vec![];   
@@ -517,7 +524,7 @@ impl<'a> DataTextures<'a> {
                 name: name.clone(), 
                 header: header, 
                 content: content, 
-                is_sky: DataTextures::is_sky(&name),
+                is_sky: is_sky_texture(&name),
             };
             return Some(patch);
         }            
@@ -560,7 +567,7 @@ impl<'a> DataTextures<'a> {
         self.textures.as_ref().borrow_mut().reserve(self.texture_maps.len());
         for texture_map in &self.texture_maps {
             self.textures.as_ref().borrow_mut().push(Rc::new(Texture {
-                is_sky: DataTextures::is_sky(&texture_map.name),
+                is_sky: is_sky_texture(&texture_map.name),
                 size: Vector2::new(texture_map.size[0], texture_map.size[1]),
                 colors : {
                     // Texture
