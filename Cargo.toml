@@ -20,6 +20,8 @@ rustflags = ["-Z", "threads=8"]
 [profile.dev]
 opt-level = 0
 debug = true
+incremental = true
+codegen-units = 256
 
 [profile.release]
 opt-level = 3
@@ -27,3 +29,5 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+overflow-checks = false
+debug-assertions = false
