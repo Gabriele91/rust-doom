@@ -612,21 +612,21 @@ pub mod render_3d {
                     // Alias
                     let seg = *ref_seg;
                     let line = seg.line_defs(&self.map);
-                    let side = line.right_side(&self.map).unwrap();
-                    let sector = seg.right_sector(&self.map).unwrap();
+                    let side = line.front_side(&self.map).unwrap();
+                    let sector = seg.front_sector(&self.map).unwrap();
                     let angle = actor.angle() as f32;
                     let height = *actor.height();
                     let position = Vector2::<f32>::from( actor.position() );
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
+                    let ceiling_texture_name = &sector.ceiling_texture;
                     let wall_texture_name = &side.middle_texture;
                     let floor_texture_name = &sector.floor_texture;
-                    let ceiling_texture_name = &sector.ceiling_texture;
                     let light_level = math::clamp( sector.light_level as f32 / 255.0, 0.0, 1.0);
                     // Get texture
-                    let wall_texture = self.data_textures.texture(&wall_texture_name).unwrap();
                     let ceiling_texture = self.data_textures.flat(&ceiling_texture_name).clone();
+                    let wall_texture = self.data_textures.texture(&wall_texture_name).unwrap();
                     let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
                     // Height of wall w/ rispect to player
                     let wall_ceiling = sector.ceiling_height - height;
@@ -693,7 +693,6 @@ pub mod render_3d {
                         if b_draw_ceiling {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                            
                             if ceiling_wall_y1 < ceiling_wall_y2 {
                                 if let Some(ref texture) = ceiling_texture { 
                                     self.draw_flat(
@@ -709,13 +708,6 @@ pub mod render_3d {
                                     );
                                 }
                             }
-                            /*self.draw_line(
-                                surface, 
-                                x as i32, 
-                                ceiling_wall_y1, 
-                                ceiling_wall_y2, 
-                                &RenderSoftware::name_to_color(&ceiling_texture_name, &light_level)
-                            );*/
                         }
                         if b_draw_wall {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
@@ -756,14 +748,6 @@ pub mod render_3d {
                                     );
                                 }
                             }
-                            /* 
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                floor_wall_y1, 
-                                floor_wall_y2, 
-                                &RenderSoftware::name_to_color(&floor_texture_name, &light_level)
-                            ); */
                         }
                         // Next step
                         wall_tex_y_scale += wall_scale_step;
@@ -775,55 +759,57 @@ pub mod render_3d {
                     // Alias
                     let seg = *ref_seg;
                     let line = seg.line_defs(&self.map);
-                    let side = line.right_side(&self.map).unwrap();
-                    let right_sector = seg.right_sector(&self.map).unwrap();
-                    let left_sector = seg.left_sector(&self.map).unwrap();
+                    let side = line.front_side(&self.map).unwrap();
+                    let front_sector = seg.front_sector(&self.map).unwrap();
+                    let back_sector = seg.back_sector(&self.map).unwrap();
                     let angle = actor.angle() as f32;
                     let position = Vector2::<f32>::from( actor.position() );
                     let height = *actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
+                    let ceiling_texture_name = &front_sector.ceiling_texture;
                     let upper_texture_name = &side.upper_texture;
                     let lower_texture_name = &side.lower_texture;
-                    let floor_texture_name = &right_sector.floor_texture;
-                    let ceiling_texture_name = &right_sector.ceiling_texture;
-                    let light_level = math::clamp( right_sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    let floor_texture_name = &front_sector.floor_texture;
+                    let light_level = math::clamp( front_sector.light_level as f32 / 255.0, 0.0, 1.0);
                     // Height of wall w/ rispect to player
-                    let right_wall_floor = right_sector.floor_height - height;
-                    let mut right_wall_ceiling = right_sector.ceiling_height - height;
-                    let left_wall_floor = left_sector.floor_height - height;
-                    let left_wall_ceiling = left_sector.ceiling_height - height;
+                    let front_wall_floor = front_sector.floor_height - height;
+                    let mut front_wall_ceiling = front_sector.ceiling_height - height;
+                    let back_wall_floor = back_sector.floor_height - height;
+                    let back_wall_ceiling = back_sector.ceiling_height - height;
                     // set what to draw
                     let mut b_draw_upper_wall = false;
                     let mut b_draw_ceiling = false;
                     let mut b_draw_floor = false;
                     let mut b_draw_lower_wall = false;
                     // Test if the upper is a sky
-                    if  right_sector.ceiling_texture == left_sector.ceiling_texture && is_sky_texture(&ceiling_texture_name) {
-                        right_wall_ceiling = left_wall_ceiling;
+                    if  front_sector.ceiling_texture == back_sector.ceiling_texture && is_sky_texture(&ceiling_texture_name) {
+                        front_wall_ceiling = back_wall_ceiling;
                     }
                     // What to draw
-                    if right_wall_ceiling != left_wall_ceiling 
-                    || right_sector.light_level != left_sector.light_level 
-                    || right_sector.ceiling_texture != left_sector.ceiling_texture {
-                        b_draw_upper_wall = (*upper_texture_name) != consts::VOID_TEXTURE && left_wall_ceiling < right_wall_ceiling;
-                        b_draw_ceiling = right_wall_ceiling >= 0;
+                    if front_wall_ceiling != back_wall_ceiling 
+                    || front_sector.light_level != back_sector.light_level 
+                    || front_sector.ceiling_texture != back_sector.ceiling_texture {
+                        b_draw_upper_wall = (*upper_texture_name) != consts::VOID_TEXTURE && back_wall_ceiling < front_wall_ceiling;
+                        b_draw_ceiling = front_wall_ceiling >= 0;
                     }
 
-                    if right_wall_floor != left_wall_floor 
-                    || right_sector.light_level != left_sector.light_level 
-                    || right_sector.floor_texture != left_sector.floor_texture {
-                        b_draw_lower_wall = (*lower_texture_name) != consts::VOID_TEXTURE && left_wall_floor > right_wall_floor;
-                        b_draw_floor = right_wall_floor <= 0;
+                    if front_wall_floor != back_wall_floor 
+                    || front_sector.light_level != back_sector.light_level 
+                    || front_sector.floor_texture != back_sector.floor_texture {
+                        b_draw_lower_wall = (*lower_texture_name) != consts::VOID_TEXTURE && back_wall_floor > front_wall_floor;
+                        b_draw_floor = front_wall_floor <= 0;
                     }
                     // Test
                     if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
                         return;
                     }
                     // Get texture
+                    let ceiling_texture = self.data_textures.flat(&ceiling_texture_name).clone();
                     let upper_texture = self.data_textures.texture(&upper_texture_name).clone();
                     let lower_texture = self.data_textures.texture(&lower_texture_name).clone();
+                    let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
                     let offset_angle = wall_normal_angle - wall_angle;
@@ -873,9 +859,9 @@ pub mod render_3d {
                                 upper_texture_alt: {
                                     if b_draw_upper_wall {
                                         if (line.flag & LINEDEF_FLAGS::DONT_PEG_TOP.value()) != 0 { 
-                                            right_wall_ceiling + side.offset.y
+                                            front_wall_ceiling + side.offset.y
                                         } else {
-                                            left_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y
+                                            back_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y
                                         }
                                     } else {
                                         0i16
@@ -884,9 +870,9 @@ pub mod render_3d {
                                 lower_texture_alt: {
                                     if b_draw_lower_wall {
                                         if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
-                                            right_wall_ceiling + side.offset.y
+                                            front_wall_ceiling + side.offset.y
                                         } else {
-                                            left_wall_floor + side.offset.y  
+                                            back_wall_floor + side.offset.y  
                                         }
                                     } else {
                                         0i16
@@ -899,23 +885,23 @@ pub mod render_3d {
                     let mut wall_tex_y_scale = wall_scale_1;
                     // Determine where on the screen the wall is drawn
                     // Top wall
-                    let mut wall_y1 = half_height - right_wall_ceiling as f32 * wall_scale_1;
-                    let wall_y1_step = -wall_scale_step * right_wall_ceiling as f32;
+                    let mut wall_y1 = half_height - front_wall_ceiling as f32 * wall_scale_1;
+                    let wall_y1_step = -wall_scale_step * front_wall_ceiling as f32;
                     // Bottom wall
-                    let mut wall_y2 = half_height - right_wall_floor as f32 * wall_scale_1;
-                    let wall_y2_step = -wall_scale_step * right_wall_floor as f32;
+                    let mut wall_y2 = half_height - front_wall_floor as f32 * wall_scale_1;
+                    let wall_y2_step = -wall_scale_step * front_wall_floor as f32;
                     // Determinate y for the top and bottom walls
                     let mut portal_y1 = wall_y2;
                     let mut portal_y1_step = wall_y2_step;
-                    if b_draw_upper_wall && left_wall_ceiling > right_wall_floor {
-                            portal_y1 = half_height - left_wall_ceiling as f32 * wall_scale_1;
-                            portal_y1_step = -wall_scale_step * left_wall_ceiling as f32;
+                    if b_draw_upper_wall && back_wall_ceiling > front_wall_floor {
+                            portal_y1 = half_height - back_wall_ceiling as f32 * wall_scale_1;
+                            portal_y1_step = -wall_scale_step * back_wall_ceiling as f32;
                     }
                     let mut portal_y2 = wall_y1;
                     let mut portal_y2_step = wall_y1_step;
-                    if b_draw_lower_wall && left_wall_floor < right_wall_ceiling {
-                            portal_y2 = half_height - left_wall_floor as f32 * wall_scale_1;
-                            portal_y2_step = -wall_scale_step * left_wall_floor as f32;
+                    if b_draw_lower_wall && back_wall_floor < front_wall_ceiling {
+                            portal_y2 = half_height - back_wall_floor as f32 * wall_scale_1;
+                            portal_y2_step = -wall_scale_step * back_wall_floor as f32;
                     }
 
                     // Draw
@@ -937,13 +923,21 @@ pub mod render_3d {
                             if b_draw_ceiling {
                                 let ceiling_wall_y1 = self.upper_clip[x as usize];
                                 let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                                self.draw_line(
-                                    surface, 
-                                    x as i32, 
-                                    ceiling_wall_y1, 
-                                    ceiling_wall_y2, 
-                                    &RenderSoftware::name_to_color(&ceiling_texture_name, &light_level)
-                                );
+                                if ceiling_wall_y1 < ceiling_wall_y2 {
+                                    if let Some(ref texture) = ceiling_texture { 
+                                        self.draw_flat(
+                                            surface, 
+                                            x as i32, 
+                                            ceiling_wall_y1, 
+                                            ceiling_wall_y2, 
+                                            front_wall_ceiling, 
+                                            angle, 
+                                            position, 
+                                            texture.as_ref(), 
+                                            light_level
+                                        );
+                                    }
+                                }
                             }
                             let draw_upper_wall_y1 = wall_y1 as i32 - 1;
                             let draw_upper_wall_y2 = portal_y1 as i32;
@@ -975,13 +969,21 @@ pub mod render_3d {
                         if b_draw_ceiling {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                ceiling_wall_y1, 
-                                ceiling_wall_y2, 
-                                &RenderSoftware::name_to_color(&ceiling_texture_name, &light_level)
-                            );
+                            if ceiling_wall_y1 < ceiling_wall_y2 {
+                                if let Some(ref texture) = ceiling_texture { 
+                                    self.draw_flat(
+                                        surface, 
+                                        x as i32, 
+                                        ceiling_wall_y1, 
+                                        ceiling_wall_y2, 
+                                        front_wall_ceiling, 
+                                        angle, 
+                                        position, 
+                                        texture.as_ref(), 
+                                        light_level
+                                    );
+                                }
+                            }
                             if self.upper_clip[x as usize] < ceiling_wall_y2 {
                                 self.upper_clip[x as usize] = ceiling_wall_y2
                             }
@@ -991,13 +993,21 @@ pub mod render_3d {
                             if b_draw_floor {
                                 let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
                                 let floor_wall_y2 = self.lower_clip[x as usize];
-                                self.draw_line(
-                                    surface, 
-                                    x as i32, 
-                                    floor_wall_y1, 
-                                    floor_wall_y2, 
-                                    &RenderSoftware::name_to_color(&floor_texture_name, &light_level)
-                                );
+                                if floor_wall_y1 < floor_wall_y2 {
+                                    if let Some(ref texture) = floor_texture { 
+                                        self.draw_flat(
+                                            surface, 
+                                            x as i32, 
+                                            floor_wall_y1, 
+                                            floor_wall_y2, 
+                                            front_wall_floor, 
+                                            angle, 
+                                            position, 
+                                            texture.as_ref(), 
+                                            light_level
+                                        );
+                                    }
+                                }
                             }
                             let draw_lower_wall_y1 = portal_y2 as i32 - 1;
                             let draw_lower_wall_y2 = wall_y2 as i32;
@@ -1028,13 +1038,21 @@ pub mod render_3d {
                         if b_draw_floor {
                             let floor_wall_y1 = math::max(draw_wall_y2, self.upper_clip[x as usize]);
                             let floor_wall_y2 = self.lower_clip[x as usize];
-                            self.draw_line(
-                                surface, 
-                                x as i32, 
-                                floor_wall_y1, 
-                                floor_wall_y2, 
-                                &RenderSoftware::name_to_color(&floor_texture_name, &light_level)
-                            );
+                            if floor_wall_y1 < floor_wall_y2 {
+                                if let Some(ref texture) = floor_texture { 
+                                    self.draw_flat(
+                                        surface, 
+                                        x as i32, 
+                                        floor_wall_y1, 
+                                        floor_wall_y2, 
+                                        front_wall_floor, 
+                                        angle, 
+                                        position, 
+                                        texture.as_ref(), 
+                                        light_level
+                                    );
+                                }
+                            }
                             if self.lower_clip[x as usize] > draw_wall_y2 {
                                 self.lower_clip[x as usize] = floor_wall_y1;
                             }

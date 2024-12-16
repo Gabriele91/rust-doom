@@ -167,13 +167,21 @@ impl LineDef {
         return None;
     }
     
+    pub fn front_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
+        return self.right_side(&map);
+    }
+    
     pub fn left_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
         if self.left_sidedef_id != 0xFFFF {
             return Some(map.side_defs[self.left_sidedef_id as usize]);
         }
         return None;
     }
-
+    
+    pub fn back_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
+        return self.left_side(&map);
+    }
+    
     pub fn start_vertex<'a>(&'a self, map: &Map<'a>) -> &'a Vertex {
         return &map.vertices[self.start_vertex_id as usize];
     }
@@ -214,6 +222,10 @@ impl Seg {
         return None;
     }
 
+    pub fn front_sector<'a>(&'a self, map: &Map<'a>) -> Option<&'a Sector> {
+        return self.right_sector(&map);
+    }
+
     pub fn left_sector<'a>(&'a self, map: &Map<'a>) -> Option<&'a Sector> {
         let line_defs = self.line_defs(&map);
         if self.direction == 0 {
@@ -226,6 +238,10 @@ impl Seg {
             }
         } 
         return None;
+    }
+
+    pub fn back_sector<'a>(&'a self, map: &Map<'a>) -> Option<&'a Sector> {
+        return self.left_sector(&map);
     }
 
     pub fn start_vertex<'a>(&'a self, map: &Map<'a>) -> &'a Vertex {

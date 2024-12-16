@@ -330,6 +330,10 @@ impl<'a> DataTextures<'a> {
                     data_textures.build_sprites(&data_textures.palettes[0]);
                     data_textures.build_textures();
                 }
+                // Assert!
+                assert!(data_textures.flats_names.len() == data_textures.flats.as_ref().borrow().len(), "|flats' names| != |flats|");
+                assert!(data_textures.sprite_patches.len() == data_textures.sprites.as_ref().borrow().len(), "|sprites' names| != |sprites|");
+                assert!(data_textures.texture_maps.len() == data_textures.textures.as_ref().borrow().len(), "|textures' names| != |textures|");
                 
                 return Some(data_textures);
             }
@@ -337,13 +341,16 @@ impl<'a> DataTextures<'a> {
         return None;
     }   
 
-    // Basic
+    // Basic    
+    fn extract_<T>(&self, directory: &wad::Directory) -> &'a T {
+        let buffer = &self.reader.buffer;
+        let value: &'a T = unsafe { mem::transmute(&buffer[directory.start()]) };
+        return value;
+    }
+
     fn extract<T>(&self, directories: &wad::DirectoryList, name: String) -> Option<&'a T> {
         if let Some(directory_id) = directories.index_of(&name) {
-            let buffer = &self.reader.buffer;
-            let directory = directories[directory_id];
-            let value: &'a T = unsafe { mem::transmute(&buffer[directory.start()]) };
-            return Some(value);
+            return Some(self.extract_(&directories[directory_id]));
         }
         return None;
     }
@@ -375,6 +382,7 @@ impl<'a> DataTextures<'a> {
         let mut vec_t = vec![];   
         if let Some(start_id) = directories.index_of(&start) {
             if let Some(end_id) = directories.index_of(&end) {
+                vec_t.reserve( end_id - start_id + 1);
                 for id in start_id..=end_id {
                     vec_t.push(directories[id].lump_name.clone());
                 }
@@ -387,8 +395,9 @@ impl<'a> DataTextures<'a> {
         let mut vec_t = vec![];   
         if let Some(start_id) = directories.index_of(&start) {
             if let Some(end_id) = directories.index_of(&end) {
+                vec_t.reserve( end_id - start_id + 1);
                 for id in start_id..=end_id {
-                    vec_t.extend(self.extract_vec::<T>(&directories[id]));
+                    vec_t.push(self.extract_::<T>(&directories[id]));
                 }
             }
         }
@@ -423,6 +432,7 @@ impl<'a> DataTextures<'a> {
         let mut vec_t = vec![];   
         if let Some(start_id) = directories.index_of(&start) {
             if let Some(end_id) = directories.index_of(&end) {
+                vec_t.reserve(end_id - start_id - 1);
                 for id in start_id+1..end_id {
                     let name = &directories[id].lump_name;
                     if let Some(patch) = self.extract_patch(directories, &name) {
