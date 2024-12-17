@@ -267,27 +267,30 @@ impl<const C: usize> Texture<C> {
 pub fn is_sky_texture(pname: &[u8;8]) -> bool {
     match pname {
         // DOOM 1&2
-        b"SKY\0\0\0\0\0" => true,
-        b"SKY1\0\0\0\0" => true,
-        b"SKY2\0\0\0\0" => true,
-        b"SKY3\0\0\0\0" => true,
-        b"SKY4\0\0\0\0" => true,
-        // Heretic
-        b"SKY5\0\0\0\0" => true,
-        // OLD TEX NAME
         b"F_SKY\0\0\0" => true,
         b"F_SKY1\0\0" => true,
         b"F_SKY2\0\0" => true,
         b"F_SKY3\0\0" => true,
         b"F_SKY4\0\0" => true,
+        // Heretic
         b"F_SKY5\0\0" => true,
-        // Hexen
-        b"SKYFOG\0\0" => true,
-        b"SKYFOG2\0" => true,
-        b"SKYWALL\0" => true,
-        b"SKYWALL2" => true,
-        _ => pname.starts_with(b"SKY")
+        _ => pname.starts_with(b"F_S")
     }    
+}
+
+pub fn remap_sky_texture(pname: &[u8; 8]) -> [u8; 8] {
+    let mut remapped: [u8; 8] = [0; 8];
+    if pname.starts_with(b"F_S") {
+        remapped[0] = b'S';  // Remap to b"S"
+        remapped[1] = pname[3];  // Remap to b"S"
+        remapped[2] = pname[4];
+        remapped[3] = pname[5];
+        remapped[4] = pname[6];
+        remapped[5] = pname[7];
+    } else {
+        remapped.copy_from_slice(pname);
+    }
+    remapped
 }
 
 // Implement DataTextures

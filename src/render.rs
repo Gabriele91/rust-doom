@@ -393,7 +393,7 @@ pub mod render_3d {
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
-    use crate::data_textures::{Texture, DataTextures, is_sky_texture};
+    use crate::data_textures::{Texture, DataTextures, is_sky_texture, remap_sky_texture};
 
     mod consts {
         pub const VOID_TEXTURE : [u8; 8] = ['-' as u8,0,0,0, 0,0,0,0];
@@ -628,11 +628,17 @@ pub mod render_3d {
                     let ceiling_texture = self.data_textures.flat(&ceiling_texture_name).clone();
                     let wall_texture = self.data_textures.texture(&wall_texture_name).unwrap();
                     let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
+                    // Get Sky texture if needed
+                    let sky_texture = {
+                        let sky_texture_name = remap_sky_texture(&ceiling_texture_name);
+                        self.data_textures.texture(&sky_texture_name).clone()
+                    };
                     // Height of wall w/ rispect to player
                     let wall_ceiling = sector.ceiling_height - height;
                     let wall_floor = sector.floor_height - height;
                     // What to draw
-                    let b_draw_ceiling = wall_ceiling > 0 || is_sky_texture(&ceiling_texture_name);
+                    let b_ceiling_is_sky = is_sky_texture(&ceiling_texture_name);
+                    let b_draw_ceiling = wall_ceiling > 0 || b_ceiling_is_sky;
                     let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
                     let b_draw_floor = wall_floor < 0;
                     // Calculate the scaling factors of the left and right edges of the wall range
@@ -694,18 +700,38 @@ pub mod render_3d {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
                             if ceiling_wall_y1 < ceiling_wall_y2 {
-                                if let Some(ref texture) = ceiling_texture { 
-                                    self.draw_flat(
-                                        surface, 
-                                        x as i32, 
-                                        ceiling_wall_y1, 
-                                        ceiling_wall_y2, 
-                                        wall_ceiling, 
-                                        angle, 
-                                        position, 
-                                        texture.as_ref(), 
-                                        light_level
-                                    );
+                                if b_ceiling_is_sky {
+                                    if let Some(ref texture) = sky_texture {
+                                        let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
+                                        let sky_inv_scale = 160.0 / self.size.width() as f32;
+                                        let sky_texture_alt = 100;
+                                        self.draw_line_texture(
+                                            surface, 
+                                            x as i32,
+                                            ceiling_wall_y1,
+                                            ceiling_wall_y2, 
+                                            texture_column, 
+                                            sky_texture_alt, 
+                                            sky_inv_scale, 
+                                            texture.as_ref(), 
+                                            1.0
+                                        );
+                                    }
+                                }
+                                else {
+                                    if let Some(ref texture) = ceiling_texture {
+                                        self.draw_flat(
+                                            surface, 
+                                            x as i32, 
+                                            ceiling_wall_y1, 
+                                            ceiling_wall_y2, 
+                                            wall_ceiling, 
+                                            angle, 
+                                            position, 
+                                            texture.as_ref(), 
+                                            light_level
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -811,6 +837,11 @@ pub mod render_3d {
                     let upper_texture = self.data_textures.texture(&upper_texture_name).clone();
                     let lower_texture = self.data_textures.texture(&lower_texture_name).clone();
                     let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
+                    // Get Sky texture if needed
+                    let sky_texture = {
+                        let sky_texture_name = remap_sky_texture(&ceiling_texture_name);
+                        self.data_textures.texture(&sky_texture_name).clone()
+                    };
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
                     let offset_angle = wall_normal_angle - wall_angle;
@@ -925,18 +956,37 @@ pub mod render_3d {
                                 let ceiling_wall_y1 = self.upper_clip[x as usize];
                                 let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
                                 if ceiling_wall_y1 < ceiling_wall_y2 {
-                                    if let Some(ref texture) = ceiling_texture { 
-                                        self.draw_flat(
-                                            surface, 
-                                            x as i32, 
-                                            ceiling_wall_y1, 
-                                            ceiling_wall_y2, 
-                                            front_wall_ceiling, 
-                                            angle, 
-                                            position, 
-                                            texture.as_ref(), 
-                                            light_level
-                                        );
+                                    if b_ceiling_is_sky {
+                                        if let Some(ref texture) = sky_texture { 
+                                            let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
+                                            let sky_inv_scale = 160.0 / self.size.width() as f32;
+                                            let sky_texture_alt = 100;
+                                            self.draw_line_texture(
+                                                surface, 
+                                                x as i32,
+                                                ceiling_wall_y1,
+                                                ceiling_wall_y2, 
+                                                texture_column, 
+                                                sky_texture_alt, 
+                                                sky_inv_scale, 
+                                                texture.as_ref(), 
+                                                1.0
+                                            );
+                                        }
+                                    } else {
+                                        if let Some(ref texture) = ceiling_texture { 
+                                            self.draw_flat(
+                                                surface, 
+                                                x as i32, 
+                                                ceiling_wall_y1, 
+                                                ceiling_wall_y2, 
+                                                front_wall_ceiling, 
+                                                angle, 
+                                                position, 
+                                                texture.as_ref(), 
+                                                light_level
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -971,18 +1021,37 @@ pub mod render_3d {
                             let ceiling_wall_y1 = self.upper_clip[x as usize];
                             let ceiling_wall_y2 = math::min(draw_wall_y1, self.lower_clip[x as usize]);
                             if ceiling_wall_y1 < ceiling_wall_y2 {
-                                if let Some(ref texture) = ceiling_texture { 
-                                    self.draw_flat(
-                                        surface, 
-                                        x as i32, 
-                                        ceiling_wall_y1, 
-                                        ceiling_wall_y2, 
-                                        front_wall_ceiling, 
-                                        angle, 
-                                        position, 
-                                        texture.as_ref(), 
-                                        light_level
-                                    );
+                                if b_ceiling_is_sky {
+                                    if let Some(ref texture) = sky_texture { 
+                                        let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
+                                        let sky_inv_scale = 160.0 / self.size.width() as f32;
+                                        let sky_texture_alt = 100;
+                                        self.draw_line_texture(
+                                            surface, 
+                                            x as i32,
+                                            ceiling_wall_y1,
+                                            ceiling_wall_y2, 
+                                            texture_column, 
+                                            sky_texture_alt, 
+                                            sky_inv_scale, 
+                                            texture.as_ref(), 
+                                            1.0
+                                        );
+                                    }
+                                } else {
+                                    if let Some(ref texture) = ceiling_texture { 
+                                        self.draw_flat(
+                                            surface, 
+                                            x as i32, 
+                                            ceiling_wall_y1, 
+                                            ceiling_wall_y2, 
+                                            front_wall_ceiling, 
+                                            angle, 
+                                            position, 
+                                            texture.as_ref(), 
+                                            light_level
+                                        );
+                                    }
                                 }
                             }
                             if self.upper_clip[x as usize] < ceiling_wall_y2 {
