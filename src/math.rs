@@ -55,6 +55,10 @@ impl<T: Float> Vector2<T> {
     pub fn magnitude(&self) -> T {
         (self.x.powi(2) + self.y.powi(2)).sqrt()
     }
+    
+    pub fn round(&self) -> Vector2<T> {
+        Vector2 { x: self.x.round(), y: self.y.round() }
+    }
 }
 
 impl<T: ops::Add<Output = T> + ops::Mul<Output = T> + ops::Sub<Output = T> + Sized + Copy + NumCast> Vector2<T> {
@@ -208,6 +212,10 @@ impl<T: Float> Vector3<T> {
     
     pub fn magnitude(&self) -> T {
         (self.x.powi(2) + self.y.powi(2) + self.z.powi(2)).sqrt()
+    }
+
+    pub fn round(&self) -> Vector3<T> {
+        Vector3 { x: self.x.round(), y: self.y.round(), z: self.z.round() }
     }
 }
 
@@ -434,6 +442,10 @@ impl<T: Float> Vector4<T> {
     
     pub fn magnitude(&self) -> T {
         (self.x.powi(2) + self.y.powi(2) + self.z.powi(2) + self.w.powi(2)).sqrt()
+    }
+    
+    pub fn round(&self) -> Vector4<T> {
+        Vector4 { x: self.x.round(), y: self.y.round(), z: self.z.round(), w: self.w.round() }
     }
 }
 

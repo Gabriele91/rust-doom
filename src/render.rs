@@ -538,13 +538,13 @@ pub mod render_3d {
             mut x: i32, 
             mut y1: i32,
             mut y2: i32, 
-            mut u: u16, 
+            column: f32, 
             texture_alt: i16, 
             inv_scale: f32,
             tex: &Texture<C>,
             light_level: f32) 
         {
-            u = u % tex.size.width();
+            let u = (column as i32).rem_euclid(tex.size.width() as i32) as u16;
             if x < self.size.width() && y1 < y2 {
                 x += self.offset.x;
                 y1 += self.offset.y;
@@ -569,7 +569,7 @@ pub mod render_3d {
             y2: i32,
             world_z: i16,
             player_angle: f32,
-            player_pos: Vector2<f32>,
+            player_pos: &Vector2<f32>,
             tex: &Texture<C>,
             light_level: f32
         ) {
@@ -614,9 +614,9 @@ pub mod render_3d {
                     let line = seg.line_defs(&self.map);
                     let side = line.front_side(&self.map).unwrap();
                     let sector = seg.front_sector(&self.map).unwrap();
-                    let angle = actor.angle() as f32;
+                    let angle = actor.float_angle();
+                    let position = actor.float_position();
                     let height = *actor.height();
-                    let position = Vector2::<f32>::from( actor.position() );
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
@@ -714,7 +714,7 @@ pub mod render_3d {
                             let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
                             if middle_wall_y1 < middle_wall_y2 {
                                 let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
-                                let texture_column = (wall_distance * radians(wall_angle).tan() - wall_offset) as u16;
+                                let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
                                 let inv_scale =  1.0 / wall_tex_y_scale;
                                 self.draw_line_texture(
                                     surface, 
@@ -762,8 +762,8 @@ pub mod render_3d {
                     let side = line.front_side(&self.map).unwrap();
                     let front_sector = seg.front_sector(&self.map).unwrap();
                     let back_sector = seg.back_sector(&self.map).unwrap();
-                    let angle = actor.angle() as f32;
-                    let position = Vector2::<f32>::from( actor.position() );
+                    let angle = actor.float_angle();
+                    let position = actor.float_position();
                     let height = *actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
@@ -911,10 +911,10 @@ pub mod render_3d {
                         let (draw_texture_column, inv_tex_scale) = {
                             if b_draw_upper_wall || b_draw_lower_wall {
                                 let wall_angle = texture_draw_data.wall_center_angle - self.camera.x_to_angle(x);
-                                let draw_texture_column = (wall_distance * radians(wall_angle).tan() - texture_draw_data.wall_offset) as u16;
+                                let draw_texture_column = wall_distance * radians(wall_angle).tan() - texture_draw_data.wall_offset;
                                 (draw_texture_column, 1.0 / wall_tex_y_scale)
                             } else {
-                                (0,0.0)
+                                (0.0,0.0)
                             }
                         };
 

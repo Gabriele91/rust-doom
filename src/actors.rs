@@ -18,6 +18,9 @@ pub trait Actor {
     fn height(&self) -> &i16;
     fn angle(&self) -> u16;
     fn flags(&self) -> u16;
+    // Best precision
+    fn float_position(&self) -> &Vector2<f32>;
+    fn float_angle(&self) -> f32;
 }
 
 pub struct Player {
@@ -77,7 +80,7 @@ impl Actor for Player {
             self.control_angle = 0.0;
             self.control_angle_update = 0.0;
         }
-        self.angle = self.internal_angle as u16;
+        self.angle = self.internal_angle.round() as u16;
         // Get move direction
         if self.control_direction.x != 0.0 || self.control_direction.y != 0.0 {
             let direction = self.control_direction.normalize();
@@ -91,7 +94,7 @@ impl Actor for Player {
                 direction.x * psin + direction.y * pcos,
             ) * self.speed;
         }
-        self.position = Vector2::<i16>::from(&self.internal_position);
+        self.position = Vector2::<i16>::from(&self.internal_position.round());
         // Height
         self.internal_height = engine.bsp.floor_height(self.position());
         self.height = self.internal_height + self.player_height;    
@@ -145,5 +148,13 @@ impl Actor for Player {
     fn flags(&self) -> u16 {
         self.flags
     }    
+
+    fn float_position(&self) -> &Vector2<f32> {
+        &self.internal_position
+    }
+
+    fn float_angle(&self) -> f32 {
+        self.internal_angle
+    }
 
 }

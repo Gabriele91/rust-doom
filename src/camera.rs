@@ -164,8 +164,8 @@ impl Camera {
     ) -> Option<(u32, u32, f32)> {
         let fv1 = Vector2::<f32>::from(&vertex1);
         let fv2 = Vector2::<f32>::from(&vertex2);
-        let fpos = Vector2::<f32>::from(&actor.position());
-        let fangle = actor.angle() as f32;
+        let fpos = actor.float_position();
+        let fangle = actor.float_angle();
         let mut segment_angle1 = degrees(angle(&fpos, &fv1));
         let mut segment_angle2 = degrees(angle(&fpos, &fv2));
         // Save wall angle
