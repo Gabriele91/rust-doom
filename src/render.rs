@@ -632,8 +632,8 @@ pub mod render_3d {
                     let wall_ceiling = sector.ceiling_height - height;
                     let wall_floor = sector.floor_height - height;
                     // What to draw
+                    let b_draw_ceiling = wall_ceiling > 0 || is_sky_texture(&ceiling_texture_name);
                     let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
-                    let b_draw_ceiling = wall_ceiling > 0;
                     let b_draw_floor = wall_floor < 0;
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
@@ -783,8 +783,9 @@ pub mod render_3d {
                     let mut b_draw_ceiling = false;
                     let mut b_draw_floor = false;
                     let mut b_draw_lower_wall = false;
+                    let b_ceiling_is_sky= is_sky_texture(&ceiling_texture_name);
                     // Test if the upper is a sky
-                    if  front_sector.ceiling_texture == back_sector.ceiling_texture && is_sky_texture(&ceiling_texture_name) {
+                    if  front_sector.ceiling_texture == back_sector.ceiling_texture && b_ceiling_is_sky {
                         front_wall_ceiling = back_wall_ceiling;
                     }
                     // What to draw
@@ -792,7 +793,7 @@ pub mod render_3d {
                     || front_sector.light_level != back_sector.light_level 
                     || front_sector.ceiling_texture != back_sector.ceiling_texture {
                         b_draw_upper_wall = (*upper_texture_name) != consts::VOID_TEXTURE && back_wall_ceiling < front_wall_ceiling;
-                        b_draw_ceiling = front_wall_ceiling >= 0;
+                        b_draw_ceiling = front_wall_ceiling >= 0 || b_ceiling_is_sky;
                     }
 
                     if front_wall_floor != back_wall_floor 
