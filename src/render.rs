@@ -381,6 +381,7 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
+    use std::borrow::Borrow;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::rc::Rc;
@@ -389,7 +390,7 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Seg, LINEDEF_FLAGS};
+    use crate::map::{Map, Sector, Seg, LINEDEF_FLAGS};
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
@@ -400,16 +401,29 @@ pub mod render_3d {
         pub const MAX_SCALE : f32  = 64.0;
         pub const MIN_SCALE : f32 = 0.00390625;
     }
-
-    enum WallType<'a> {
-        SolidWall(&'a Seg),
-        PortalWall(&'a Seg)
+    
+    #[derive(Clone)]
+    struct SegExtraData<'wad> {
+        seg:&'wad Seg,
+        ceiling_texture_id: Option<usize>,
+        upper_texture_id: Option<usize>,
+        wall_texture_id: Option<usize>,
+        lower_texture_id: Option<usize>,
+        floor_texture_id: Option<usize>,
+        sky_texture_id: Option<usize>,
+        light_level: f32
     }
 
+    enum WallType<'wad> {
+        SolidWall(&'wad SegExtraData<'wad>),
+        PortalWall(&'wad SegExtraData<'wad>)
+    }
+    
     // Render 3D bsp
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
         map: Rc<Map<'wad>>,
+        seg_extra_data: Vec<SegExtraData<'wad>>,
         data_textures: Rc<DataTextures<'wad>>,
         size: Vector2<i32>,
         h_size: Vector2<f32>,
@@ -418,13 +432,16 @@ pub mod render_3d {
         screen_range: Vec<bool>,
         upper_clip: Box<Vec<i32>>,
         lower_clip: Box<Vec<i32>>,
+        sky_inv_scale: f32,
+        sky_texture_alt: i16
     }
 
 
     impl<'wad> RenderSoftware<'wad> {
         pub fn new(map: &Rc<Map<'wad>>, data_textures: &Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
-            RenderSoftware {
+            let mut render = RenderSoftware {
                 map: map.clone(),
+                seg_extra_data: vec![],
                 data_textures: data_textures.clone(),
                 size: size,
                 h_size: Vector2::<f32>::from(&size) * 0.5,
@@ -433,6 +450,57 @@ pub mod render_3d {
                 screen_range: vec![false; size.width() as usize],
                 upper_clip: Box::new(vec![0; size.width() as usize]),
                 lower_clip: Box::new(vec![size.height(); size.width() as usize]),
+                sky_inv_scale : 160.0 / size.width() as f32,
+                sky_texture_alt : 100
+            };
+            render.preprocessing();
+            render
+        }
+
+        fn preprocessing(&mut self)
+        {
+            for seg in &self.map.segs {
+                self.seg_extra_data.push(SegExtraData {
+                    seg: &seg,
+                    ceiling_texture_id: seg
+                                        .front_sector(&self.map)
+                                        .and_then(|sector| self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.ceiling_texture)),
+                    upper_texture_id: {
+                        let line = seg.line_defs(&self.map);
+                        line
+                        .front_side(&self.map)
+                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.upper_texture))
+                    },
+                    wall_texture_id: {
+                        let line = seg.line_defs(&self.map);
+                        line
+                        .front_side(&self.map)
+                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.middle_texture))
+                    },
+                    lower_texture_id: {
+                        let line = seg.line_defs(&self.map);
+                        line
+                        .front_side(&self.map)
+                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.lower_texture))
+                    },
+                    floor_texture_id: seg
+                                      .front_sector(&self.map)
+                                      .and_then(|sector| self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.floor_texture)),
+                    sky_texture_id: seg
+                                    .front_sector(&self.map)
+                                    .and_then(|sector| {
+                                        if is_sky_texture(&sector.ceiling_texture) {
+                                            let sky_name = &remap_sky_texture(&sector.ceiling_texture);
+                                            self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == *sky_name)
+                                        } else {
+                                            None
+                                        }
+                                    }),
+                    light_level : seg
+                                  .front_sector(&self.map)
+                                  .and_then(|sector| Some(math::clamp(sector.light_level as f32 / 255.0, 0.0, 1.0)))
+                                  .unwrap_or(0.0 as f32),
+                });
             }
         }
         
@@ -487,10 +555,13 @@ pub mod render_3d {
             rgba
         }
         
-        fn classify_segment(&self, seg: &'wad Seg, start: u32, end: u32) -> Option<WallType<'wad>> {
+        fn classify_segment<'a>(&self, seg_ex: &'a SegExtraData<'wad>, start: u32, end: u32) -> Option<WallType<'a>> {
             if start == end {
                 return None;
             }
+
+            // Seg reference
+            let seg = seg_ex.seg;
 
             // Right is mandatory
             let right_sector = seg.right_sector(&self.map)?;
@@ -501,7 +572,7 @@ pub mod render_3d {
                 // Wall with window
                 if right_sector.floor_height != left_sector.floor_height 
                 || right_sector.ceiling_height != left_sector.ceiling_height {
-                   return Some(WallType::PortalWall(&seg));
+                   return Some(WallType::PortalWall(&seg_ex));
                 }
 
                 // Reject empty lines used for triggers and special events.
@@ -515,10 +586,10 @@ pub mod render_3d {
                 }
 
                 // Borders with different light levels and/or textures
-                return Some(WallType::PortalWall(&seg));
+                return Some(WallType::PortalWall(&seg_ex));
 
             } else {
-                return Some(WallType::SolidWall(&seg));
+                return Some(WallType::SolidWall(&seg_ex));
             }
         }
 
@@ -606,11 +677,11 @@ pub mod render_3d {
             }
         }
 
-        fn draw_wall(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, start: u32, end: u32, wall_angle: f32) {
+        fn draw_wall<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wall>, start: u32, end: u32, wall_angle: f32) {
             match wtype {
-                WallType::SolidWall(ref_seg) => {
+                WallType::SolidWall(seg_ex) => {
                     // Alias
-                    let seg = *ref_seg;
+                    let seg = seg_ex.seg;
                     let line = seg.line_defs(&self.map);
                     let side = line.front_side(&self.map).unwrap();
                     let sector = seg.front_sector(&self.map).unwrap();
@@ -620,26 +691,19 @@ pub mod render_3d {
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
-                    let ceiling_texture_name = &sector.ceiling_texture;
-                    let wall_texture_name = &side.middle_texture;
-                    let floor_texture_name = &sector.floor_texture;
-                    let light_level = math::clamp( sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    let light_level = seg_ex.light_level;
                     // Get texture
-                    let ceiling_texture = self.data_textures.flat(&ceiling_texture_name).clone();
-                    let wall_texture = self.data_textures.texture(&wall_texture_name).unwrap();
-                    let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
-                    // Get Sky texture if needed
-                    let sky_texture = {
-                        let sky_texture_name = remap_sky_texture(&ceiling_texture_name);
-                        self.data_textures.texture(&sky_texture_name).clone()
-                    };
+                    let ceiling_texture = seg_ex.ceiling_texture_id.and_then(|id| self.data_textures.flat_id(id));
+                    let wall_texture = seg_ex.wall_texture_id.and_then(|id| self.data_textures.texture_id(id));
+                    let floor_texture = seg_ex.floor_texture_id.and_then(|id| self.data_textures.flat_id(id));
+                    let sky_texture = seg_ex.sky_texture_id.and_then(|id| self.data_textures.texture_id(id));
                     // Height of wall w/ rispect to player
                     let wall_ceiling = sector.ceiling_height - height;
                     let wall_floor = sector.floor_height - height;
                     // What to draw
-                    let b_ceiling_is_sky = is_sky_texture(&ceiling_texture_name);
+                    let b_ceiling_is_sky = sky_texture.is_some();
                     let b_draw_ceiling = wall_ceiling > 0 || b_ceiling_is_sky;
-                    let b_draw_wall = side.middle_texture != consts::VOID_TEXTURE;
+                    let b_draw_wall = wall_texture.is_some();
                     let b_draw_floor = wall_floor < 0;
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
@@ -677,7 +741,7 @@ pub mod render_3d {
                     // Texture height
                     let middle_texture_alt = {
                         if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
-                            wall_floor + wall_texture.size.y as i16 + side.offset.y  
+                            wall_floor + wall_texture.as_ref().unwrap().size.y as i16 + side.offset.y  
                         } else {
                             wall_ceiling + side.offset.y  
                         }
@@ -703,16 +767,14 @@ pub mod render_3d {
                                 if b_ceiling_is_sky {
                                     if let Some(ref texture) = sky_texture {
                                         let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
-                                        let sky_inv_scale = 160.0 / self.size.width() as f32;
-                                        let sky_texture_alt = 100;
                                         self.draw_line_texture(
                                             surface, 
                                             x as i32,
                                             ceiling_wall_y1,
                                             ceiling_wall_y2, 
                                             texture_column, 
-                                            sky_texture_alt, 
-                                            sky_inv_scale, 
+                                            self.sky_texture_alt, 
+                                            self.sky_inv_scale, 
                                             texture.as_ref(), 
                                             1.0
                                         );
@@ -739,20 +801,22 @@ pub mod render_3d {
                             let middle_wall_y1 = math::max(draw_wall_y1, self.upper_clip[x as usize]);
                             let middle_wall_y2 = math::min(draw_wall_y2, self.lower_clip[x as usize]);
                             if middle_wall_y1 < middle_wall_y2 {
-                                let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
-                                let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
-                                let inv_scale =  1.0 / wall_tex_y_scale;
-                                self.draw_line_texture(
-                                    surface, 
-                                    x as i32, 
-                                    middle_wall_y1, 
-                                    middle_wall_y2, 
-                                    texture_column, 
-                                    middle_texture_alt, 
-                                    inv_scale, 
-                                    wall_texture.as_ref(), 
-                                    light_level
-                                );
+                                if let Some(ref texture) = wall_texture { 
+                                    let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
+                                    let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
+                                    let inv_scale =  1.0 / wall_tex_y_scale;
+                                    self.draw_line_texture(
+                                        surface, 
+                                        x as i32, 
+                                        middle_wall_y1, 
+                                        middle_wall_y2, 
+                                        texture_column, 
+                                        middle_texture_alt, 
+                                        inv_scale, 
+                                    texture.as_ref(), 
+                                        light_level
+                                    );
+                                }
                             }
                             
                         }
@@ -781,9 +845,9 @@ pub mod render_3d {
                         wall_y2 += wall_y2_step;
                     }
                 },
-                WallType::PortalWall(ref_seg) => {
+                WallType::PortalWall(seg_ex) => {
                     // Alias
-                    let seg = *ref_seg;
+                    let seg = seg_ex.seg;
                     let line = seg.line_defs(&self.map);
                     let side = line.front_side(&self.map).unwrap();
                     let front_sector = seg.front_sector(&self.map).unwrap();
@@ -793,12 +857,13 @@ pub mod render_3d {
                     let height = *actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
-                    // Texture
-                    let ceiling_texture_name = &front_sector.ceiling_texture;
-                    let upper_texture_name = &side.upper_texture;
-                    let lower_texture_name = &side.lower_texture;
-                    let floor_texture_name = &front_sector.floor_texture;
-                    let light_level = math::clamp( front_sector.light_level as f32 / 255.0, 0.0, 1.0);
+                    // Get texture
+                    let ceiling_texture = seg_ex.ceiling_texture_id.and_then(|id| self.data_textures.flat_id(id));
+                    let upper_texture = seg_ex.upper_texture_id.and_then(|id| self.data_textures.texture_id(id));
+                    let lower_texture = seg_ex.lower_texture_id.and_then(|id| self.data_textures.texture_id(id));
+                    let floor_texture = seg_ex.floor_texture_id.and_then(|id| self.data_textures.flat_id(id));
+                    let sky_texture = seg_ex.sky_texture_id.and_then(|id| self.data_textures.texture_id(id));
+                    let light_level = seg_ex.light_level;
                     // Height of wall w/ rispect to player
                     let front_wall_floor = front_sector.floor_height - height;
                     let mut front_wall_ceiling = front_sector.ceiling_height - height;
@@ -809,7 +874,7 @@ pub mod render_3d {
                     let mut b_draw_ceiling = false;
                     let mut b_draw_floor = false;
                     let mut b_draw_lower_wall = false;
-                    let b_ceiling_is_sky= is_sky_texture(&ceiling_texture_name);
+                    let b_ceiling_is_sky= sky_texture.is_some();
                     // Test if the upper is a sky
                     if  front_sector.ceiling_texture == back_sector.ceiling_texture && b_ceiling_is_sky {
                         front_wall_ceiling = back_wall_ceiling;
@@ -818,30 +883,20 @@ pub mod render_3d {
                     if front_wall_ceiling != back_wall_ceiling 
                     || front_sector.light_level != back_sector.light_level 
                     || front_sector.ceiling_texture != back_sector.ceiling_texture {
-                        b_draw_upper_wall = (*upper_texture_name) != consts::VOID_TEXTURE && back_wall_ceiling < front_wall_ceiling;
+                        b_draw_upper_wall = upper_texture.is_some() && back_wall_ceiling < front_wall_ceiling;
                         b_draw_ceiling = front_wall_ceiling >= 0 || b_ceiling_is_sky;
                     }
 
                     if front_wall_floor != back_wall_floor 
                     || front_sector.light_level != back_sector.light_level 
                     || front_sector.floor_texture != back_sector.floor_texture {
-                        b_draw_lower_wall = (*lower_texture_name) != consts::VOID_TEXTURE && back_wall_floor > front_wall_floor;
+                        b_draw_lower_wall = upper_texture.is_some() && back_wall_floor > front_wall_floor;
                         b_draw_floor = front_wall_floor <= 0;
                     }
                     // Test
                     if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
                         return;
                     }
-                    // Get texture
-                    let ceiling_texture = self.data_textures.flat(&ceiling_texture_name).clone();
-                    let upper_texture = self.data_textures.texture(&upper_texture_name).clone();
-                    let lower_texture = self.data_textures.texture(&lower_texture_name).clone();
-                    let floor_texture = self.data_textures.flat(&floor_texture_name).clone();
-                    // Get Sky texture if needed
-                    let sky_texture = {
-                        let sky_texture_name = remap_sky_texture(&ceiling_texture_name);
-                        self.data_textures.texture(&sky_texture_name).clone()
-                    };
                     // Calculate the scaling factors of the left and right edges of the wall range
                     let wall_normal_angle = seg.float_degrees_angle() + 90.0;
                     let offset_angle = wall_normal_angle - wall_angle;
@@ -959,16 +1014,14 @@ pub mod render_3d {
                                     if b_ceiling_is_sky {
                                         if let Some(ref texture) = sky_texture { 
                                             let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
-                                            let sky_inv_scale = 160.0 / self.size.width() as f32;
-                                            let sky_texture_alt = 100;
                                             self.draw_line_texture(
                                                 surface, 
                                                 x as i32,
                                                 ceiling_wall_y1,
                                                 ceiling_wall_y2, 
                                                 texture_column, 
-                                                sky_texture_alt, 
-                                                sky_inv_scale, 
+                                                self.sky_texture_alt, 
+                                                self.sky_inv_scale, 
                                                 texture.as_ref(), 
                                                 1.0
                                             );
@@ -1024,16 +1077,14 @@ pub mod render_3d {
                                 if b_ceiling_is_sky {
                                     if let Some(ref texture) = sky_texture { 
                                         let texture_column = 2.2 * (angle + self.camera.x_to_angle(x));
-                                        let sky_inv_scale = 160.0 / self.size.width() as f32;
-                                        let sky_texture_alt = 100;
                                         self.draw_line_texture(
                                             surface, 
                                             x as i32,
                                             ceiling_wall_y1,
                                             ceiling_wall_y2, 
-                                            texture_column, 
-                                            sky_texture_alt, 
-                                            sky_inv_scale, 
+                                            texture_column,
+                                            self.sky_texture_alt, 
+                                            self.sky_inv_scale, 
                                             texture.as_ref(), 
                                             1.0
                                         );
@@ -1136,7 +1187,7 @@ pub mod render_3d {
             }
         }
 
-        fn draw_clip_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wad>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
+        fn draw_clip_walls<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wall>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -1172,26 +1223,26 @@ pub mod render_3d {
             let surface = doom.surface.clone();
             let render = self;
             // Draw player 1
-            match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
+            match doom.actors.iter().find(|&actor| actor.as_ref().borrow().type_id() == 1) {
                 Some(actor) => {
                     bsp.visit(
-                        &actor.borrow().position(), 
+                        &actor.as_ref().borrow().position(), 
                         render,
                         |subsector_id, render|{
                         let subsector = render.map.sub_sectors[subsector_id as usize];
                         for sector_id in subsector.iter() {
-                            let seg = render.map.segs[sector_id as usize];
-                            let vertex1 = render.map.vertices[seg.start_vertex_id as usize];
-                            let vertex2 = render.map.vertices[seg.end_vertex_id as usize];
-                            if let Some((x1,x2, wall_angle)) = render.camera.clip_segment_in_frustum(actor.borrow().as_ref(), &vertex1, &vertex2) {
-                               if let Some(wtype) = render.classify_segment(&seg, x1, x2){
-                                    render.draw_clip_walls(&actor.borrow(), &mut surface.borrow_mut(), &wtype, x1,  x2, wall_angle);
+                            let seg_ex = render.seg_extra_data[sector_id as usize].clone();
+                            let vertex1= render.map.vertices[seg_ex.seg.start_vertex_id as usize];
+                            let vertex2= render.map.vertices[seg_ex.seg.end_vertex_id as usize];
+                            if let Some((x1,x2, wall_angle)) = render.camera.clip_segment_in_frustum(actor.as_ref().borrow().as_ref(), &vertex1, &vertex2) {
+                               if let Some(wtype) = render.classify_segment(&seg_ex, x1, x2){
+                                    render.draw_clip_walls(&actor.as_ref().borrow(), &mut surface.borrow_mut(), &wtype, x1,  x2, wall_angle);
                                }
                             }                               
                         }
                         return  true;
                     },|node_box, render| { 
-                        render.camera.is_box_in_frustum(actor.borrow().as_ref(), &node_box)
+                        render.camera.is_box_in_frustum(actor.as_ref().borrow().as_ref(), &node_box)
                     });
                 },
                 None => ()

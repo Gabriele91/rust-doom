@@ -429,6 +429,13 @@ impl<'a> DataTextures<'a> {
         }
         None
     }
+
+    pub fn flat_id(&self, id: usize) -> Option<Rc<Texture<3>>> {
+        if id < self.flats.as_ref().borrow().len() {
+            return Some(self.flats.as_ref().borrow()[id].clone());
+        }
+        None
+    }
         
     // Sprites
     fn extract_sprite_patches(&self, directories: &wad::DirectoryList, start: String, end: String) ->  Vec<Patch<'a>>  {
@@ -635,4 +642,10 @@ impl<'a> DataTextures<'a> {
         None
     }
 
+    pub fn texture_id(&self, id: usize) -> Option<Rc<Texture<4>>> {
+        if id < self.textures.as_ref().borrow().len() {
+            return Some(self.textures.as_ref().borrow()[id].clone());
+        }
+        None
+    }
 }
