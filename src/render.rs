@@ -425,7 +425,7 @@ pub mod render_3d {
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
         map: Rc<Map<'wad>>,
-        seg_extra_data: Vec<SegExtraData<'wad>>,
+        seg_extra_data: Vec<Box<SegExtraData<'wad>>>,
         data_textures: Rc<DataTextures<'wad>>,
         size: Vector2<i32>,
         h_size: Vector2<f32>,
@@ -460,7 +460,7 @@ pub mod render_3d {
         fn preprocessing(mut self) -> Self
         {
             for seg in &self.map.segs {
-                self.seg_extra_data.push(SegExtraData {
+                self.seg_extra_data.push(Box::new(SegExtraData {
                     seg: &seg,
                     ceiling_texture_id: seg
                                         .front_sector(&self.map)
@@ -524,7 +524,7 @@ pub mod render_3d {
                                   .front_sector(&self.map)
                                   .and_then(|sector| Some(math::clamp(sector.light_level as f32 / 255.0, 0.0, 1.0)))
                                   .unwrap_or(0.0 as f32),
-                });
+                }));
             }
             // Returns itself
             self
