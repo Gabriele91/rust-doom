@@ -400,6 +400,8 @@ pub mod render_3d {
         pub const VOID_TEXTURE : [u8; 8] = ['-' as u8,0,0,0, 0,0,0,0];
         pub const MAX_SCALE : f32  = 64.0;
         pub const MIN_SCALE : f32 = 0.00390625;
+        pub const SKY_SCALE : f32 = 160.0;
+        pub const SKY_ALT : i16 = 100
     }
     
     #[derive(Clone)]
@@ -450,8 +452,8 @@ pub mod render_3d {
                 screen_range: vec![false; size.width() as usize],
                 upper_clip: Box::new(vec![0; size.width() as usize]),
                 lower_clip: Box::new(vec![size.height(); size.width() as usize]),
-                sky_inv_scale : 160.0 / size.width() as f32,
-                sky_texture_alt : 100
+                sky_inv_scale : consts::SKY_SCALE / size.width() as f32,
+                sky_texture_alt : consts::SKY_ALT
             };
             render.preprocessing();
             render
@@ -469,27 +471,51 @@ pub mod render_3d {
                         let line = seg.line_defs(&self.map);
                         line
                         .front_side(&self.map)
-                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.upper_texture))
+                        .and_then(|side| {
+                            if side.upper_texture != consts::VOID_TEXTURE {  
+                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.upper_texture) } 
+                            else { 
+                                None 
+                            }
+                        })
                     },
                     wall_texture_id: {
                         let line = seg.line_defs(&self.map);
                         line
                         .front_side(&self.map)
-                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.middle_texture))
+                        .and_then(|side| { 
+                            if side.middle_texture != consts::VOID_TEXTURE {  
+                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.middle_texture)  
+                            } else {
+                                None
+                            }
+                        })
                     },
                     lower_texture_id: {
                         let line = seg.line_defs(&self.map);
                         line
                         .front_side(&self.map)
-                        .and_then(|size| self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == size.lower_texture))
+                        .and_then(|side| { 
+                            if side.lower_texture != consts::VOID_TEXTURE {  
+                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.lower_texture)  
+                            } else {
+                                None
+                            }
+                        })
                     },
                     floor_texture_id: seg
                                       .front_sector(&self.map)
-                                      .and_then(|sector| self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.floor_texture)),
+                                      .and_then(|sector| {
+                                        if sector.floor_texture != consts::VOID_TEXTURE {
+                                            self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.floor_texture)
+                                        } else {
+                                            None
+                                        }
+                                      }),
                     sky_texture_id: seg
                                     .front_sector(&self.map)
                                     .and_then(|sector| {
-                                        if is_sky_texture(&sector.ceiling_texture) {
+                                        if sector.ceiling_texture != consts::VOID_TEXTURE && is_sky_texture(&sector.ceiling_texture) {
                                             let sky_name = &remap_sky_texture(&sector.ceiling_texture);
                                             self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == *sky_name)
                                         } else {
