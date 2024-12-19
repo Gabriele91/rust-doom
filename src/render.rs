@@ -441,7 +441,7 @@ pub mod render_3d {
 
     impl<'wad> RenderSoftware<'wad> {
         pub fn new(map: &Rc<Map<'wad>>, data_textures: &Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
-            let mut render = RenderSoftware {
+            RenderSoftware {
                 map: map.clone(),
                 seg_extra_data: vec![],
                 data_textures: data_textures.clone(),
@@ -454,12 +454,10 @@ pub mod render_3d {
                 lower_clip: Box::new(vec![size.height(); size.width() as usize]),
                 sky_inv_scale : consts::SKY_SCALE / size.width() as f32,
                 sky_texture_alt : consts::SKY_ALT
-            };
-            render.preprocessing();
-            render
+            }.preprocessing()
         }
 
-        fn preprocessing(&mut self)
+        fn preprocessing(mut self) -> Self
         {
             for seg in &self.map.segs {
                 self.seg_extra_data.push(SegExtraData {
@@ -528,6 +526,8 @@ pub mod render_3d {
                                   .unwrap_or(0.0 as f32),
                 });
             }
+            // Returns itself
+            self
         }
         
         fn reset(&mut self) {
