@@ -41,7 +41,11 @@ pub struct Player {
     speed: f32,
     angle_speed: f32,
     player_height: i16,
-
+    // Jump
+    player_jump_max: i16,
+    player_jump_speed: i16,
+    player_jump: i16,
+    player_jump_lock: bool,
 }
 
 impl Player {
@@ -66,6 +70,10 @@ impl Player {
             speed: configure.player.speed,
             angle_speed: configure.player.angle_speed,
             player_height: configure.player.height,
+            player_jump_max: configure.player.jump,
+            player_jump_speed: configure.player.jump_speed,
+            player_jump: 0,
+            player_jump_lock: false
         })
     }
 }
@@ -96,8 +104,15 @@ impl Actor for Player {
         }
         self.position = Vector2::<i16>::from(&self.internal_position.round());
         // Height
+        if self.player_jump_lock {
+            self.player_jump -= self.player_jump_speed;
+            if self.player_jump <= 0 {
+                self.player_jump_lock = false;
+                self.player_jump = 0;
+            }
+        }
         self.internal_height = engine.bsp.floor_height(self.position());
-        self.height = self.internal_height + self.player_height;    
+        self.height = self.internal_height + self.player_height + self.player_jump;    
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
@@ -108,7 +123,7 @@ impl Actor for Player {
         if !input.key_held(KeyCode::KeyW) 
         &&  input.key_held(KeyCode::KeyS) {
             self.control_direction -= Vector2::new(0.0, 1.0);
-        }        
+        }   
         if  input.key_held(KeyCode::KeyA) 
         && !input.key_held(KeyCode::KeyD) {
             self.control_direction -= Vector2::new(1.0, 0.0);
@@ -126,6 +141,13 @@ impl Actor for Player {
         &&  input.key_held(KeyCode::ArrowRight) {
             self.control_angle -= 1.0;
             self.control_angle_update += 1.0;
+        }
+        if input.key_held(KeyCode::KeyE) 
+        && self.player_jump < self.player_jump_max 
+        && !self.player_jump_lock {
+            self.player_jump += self.player_jump_speed;
+        } else if self.player_jump != 0 {
+            self.player_jump_lock = true;
         }
     }
 

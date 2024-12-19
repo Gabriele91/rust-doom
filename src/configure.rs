@@ -23,6 +23,8 @@ pub struct Player {
     pub speed: f32,
     pub angle_speed: f32,
     pub height: i16,
+    pub jump: i16,
+    pub jump_speed: i16
 }
 
 pub struct Render {
@@ -124,6 +126,8 @@ impl Player {
             speed: props.get("speed")?.parse().ok()?,
             angle_speed: props.get("angle_speed")?.parse().ok()?,
             height: props.get("height")?.parse().ok()?,
+            jump: props.get("jump")?.parse().ok()?,
+            jump_speed: props.get("jump_speed")?.parse().ok()?,
         })
     }
 }
