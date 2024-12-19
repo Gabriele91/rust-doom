@@ -766,10 +766,14 @@ pub mod render_3d {
                     let wall_center_angle = wall_normal_angle - angle;
                     // Texture height
                     let middle_texture_alt = {
-                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
-                            wall_floor + wall_texture.as_ref().unwrap().size.y as i16 + side.offset.y  
+                        if let Some(ref texture) = wall_texture {
+                            if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                                wall_floor + texture.size.y as i16 + side.offset.y  
+                            } else {
+                                wall_ceiling + side.offset.y  
+                            }
                         } else {
-                            wall_ceiling + side.offset.y  
+                            0
                         }
                     };
                     // Texture scale
