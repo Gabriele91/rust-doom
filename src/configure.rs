@@ -27,6 +27,10 @@ pub struct Player {
     pub jump_speed: i16
 }
 
+pub struct Map {
+    pub name: String,
+}
+
 pub struct Render {
     pub map_2d: Option<Vector4<i32>>, 
     pub bsp_2d: Option<Vector4<i32>>, 
@@ -43,6 +47,7 @@ pub struct Configure {
     pub screen: Screen,
     pub camera: Camera,
     pub player: Player,
+    pub map: Map,
     pub render: Option<Render>,
 }
 
@@ -132,6 +137,14 @@ impl Player {
     }
 }
 
+impl Map {
+    pub fn from(props: &Properties) -> Option<Self> {
+        Some(Map { 
+            name: String::from(props.get("name")?),
+        })
+    }
+}
+
 impl Screen {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Screen { 
@@ -169,6 +182,7 @@ impl Configure {
                 screen : Screen::from(ini.section(Some("Screen"))?)?,
                 camera : Camera::from(ini.section(Some("Camera"))?)?,
                 player : Player::from(ini.section(Some("Player"))?)?,
+                map : Map::from(ini.section(Some("Map"))?)?,
                 render : Render::from(ini.section(Some("Render"))),
             });
         }

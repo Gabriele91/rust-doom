@@ -44,7 +44,7 @@ macro_rules! crea_render {
 impl<'wad> Doom<'wad> {
     pub fn new(window: &Window, configure: &Configure) -> Box<Self> {
         let wad = Rc::new(Reader::new(&configure.resource.wad).unwrap());
-        let map = Rc::new(Map::new(&wad, &String::from("E1M1")).unwrap());
+        let map = Rc::new(Map::new(&wad, &configure.map.name).unwrap());
         let data_textures = Rc::new(DataTextures::new(&wad).unwrap());
         let surface = Rc::new(RefCell::new(
             DoomSurface::new(
