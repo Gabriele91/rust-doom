@@ -401,7 +401,7 @@ pub mod render_3d {
         pub const MAX_SCALE : f32  = 64.0;
         pub const MIN_SCALE : f32 = 0.00390625;
         pub const SKY_SCALE : f32 = 160.0;
-        pub const SKY_ALT : i16 = 100
+        pub const SKY_ALT : i16 = 100;
     }
     
     #[derive(Clone)]
@@ -916,7 +916,7 @@ pub mod render_3d {
                     if front_wall_floor != back_wall_floor 
                     || front_sector.light_level != back_sector.light_level 
                     || front_sector.floor_texture != back_sector.floor_texture {
-                        b_draw_lower_wall = upper_texture.is_some() && back_wall_floor > front_wall_floor;
+                        b_draw_lower_wall = floor_texture.is_some() && back_wall_floor > front_wall_floor;
                         b_draw_floor = front_wall_floor <= 0;
                     }
                     // Test
