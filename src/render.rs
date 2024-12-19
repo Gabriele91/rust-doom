@@ -438,6 +438,14 @@ pub mod render_3d {
         sky_texture_alt: i16
     }
 
+    fn circual_tex(value:f32, size: u16) -> u16 {
+        let mod_value = value % size as f32;
+        if mod_value < 0.0 {
+            (mod_value + size as f32 - 1.0) as u16
+        } else {
+            mod_value as u16
+        }
+    }
 
     impl<'wad> RenderSoftware<'wad> {
         pub fn new(map: &Rc<Map<'wad>>, data_textures: &Rc<DataTextures<'wad>>, size: Vector2<i32>, offset: Vector2<i32>, configure: &configure::Camera) -> Self {
@@ -628,7 +636,7 @@ pub mod render_3d {
                 surface.draw_line_lt(&start, &end, &color);
             }
         }
-        
+
         fn draw_line_texture<const C: usize>(
             &self, 
             surface: &mut DoomSurface, 
@@ -641,14 +649,14 @@ pub mod render_3d {
             tex: &Texture<C>,
             light_level: f32) 
         {
-            let u = (column as i32).rem_euclid(tex.size.width() as i32) as u16;
+            let u = circual_tex(column, tex.size.width());
             if x < self.size.width() && y1 < y2 {
                 x += self.offset.x;
                 y1 += self.offset.y;
                 y2 += self.offset.y;
                 let mut v: f32 = texture_alt as f32 + ((y1 as f32 - self.h_size.height()) * inv_scale);
                 for y in y1..y2 {
-                    let mut color = tex.get(u, v as u16 % tex.size.height()).clone();
+                    let mut color = tex.get(u, circual_tex(v, tex.size.height())).clone();
                     surface.draw_lt(
                     &Vector2::new(x as usize, y as usize), 
                     RenderSoftware::apply_light_to_color(&mut color, light_level)
@@ -690,8 +698,8 @@ pub mod render_3d {
                     let dx = (right_x - left_x) / self.size.width() as f32;
                     let dy = (right_y - left_y) / self.size.width() as f32;
         
-                    let tx = (left_x + dx * x as f32).rem_euclid(tex.size.width() as f32) as u16;
-                    let ty = (left_y + dy * x as f32).rem_euclid(tex.size.height() as f32) as u16;
+                    let tx = circual_tex(left_x + dx * x as f32, tex.size.width());
+                    let ty = circual_tex(left_y + dy * x as f32, tex.size.height());
         
                     let mut color = tex.get(tx, ty).clone();
 
