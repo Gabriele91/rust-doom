@@ -1,5 +1,7 @@
 # Rust
 /target
+# prebuild
+src/prebuild/**
 # Cargo
 *.lock
 # Doom

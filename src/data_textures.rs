@@ -1,3 +1,4 @@
+use bytemuck::cast_slice;
 // Global
 use std::{
     mem, 
@@ -410,6 +411,25 @@ impl<'a> DataTextures<'a> {
         }
         vec_t
     }
+
+    fn unknown_flat(&self) -> Vec<[u8; 3]> {
+        // Include at compile time unknown_flat
+        static BIN_DATA: &[u8] = include_bytes!("prebuild/textures/unknown_flat.bin");
+        cast_slice::<u8, [u8; 3]>(BIN_DATA)
+                                .iter()
+                                .cloned()
+                                .collect()
+    }
+    
+    fn unknown_texture(&self) -> Vec<[u8; 4]> {
+        // Include at compile time unknown_texture
+        static BIN_DATA: &[u8] = include_bytes!("prebuild/textures/unknown_texture.bin");
+        cast_slice::<u8, [u8; 4]>(BIN_DATA)
+                                .iter()
+                                .cloned()
+                                .collect()
+    }
+
     // Flats
     fn build_flats(&mut self, palette: &Palette) {
         self.flats.as_ref().borrow_mut().clear();
@@ -428,7 +448,7 @@ impl<'a> DataTextures<'a> {
                 self.flats.as_ref().borrow_mut().push(Rc::new(
                     Texture {
                         size: Vector2::new(64, 64),
-                        colors: vec![[0,0,0];64*64]
+                        colors: self.unknown_flat()
                     }
                 ))
             }
@@ -531,7 +551,7 @@ impl<'a> DataTextures<'a> {
                         let datas = {
                             let mut data_t: Vec<PatchColumnData<'_>> = vec![];
                             let mut offset = lump_offset + *column_offset as usize;
-                            loop {
+                            while offset < buffer.len() {
                                 let column_header: &'a PatchColumnHeaderData = unsafe { mem::transmute(&buffer[offset]) };
                                 //println!("column_header: {:?}", &column_header);
                                 if column_header.y_offset == 0xFF { break; }

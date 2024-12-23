@@ -6,6 +6,10 @@ name = "rust-doom"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.83.0"
+build = "prebuild/build.rs"
+
+[build-dependencies]
+lazy_static = "1.5.0"
 
 [dependencies]
 lazy_static = "1.5.0"
@@ -16,6 +20,7 @@ winit = { version = "0.29.15", default-features = false, features = ["rwh_05", "
 winit_input_helper = "0.15.3"
 readonly = "0.2.12"
 rust-ini = "0.21.1"
+bytemuck = "1.21.0"
 
 [profile.dev]
 opt-level = 0
