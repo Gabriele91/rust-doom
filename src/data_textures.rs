@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use bytemuck::cast_slice;
 // Global
 use std::{

@@ -124,6 +124,10 @@ impl<'a> DirectoryList<'a> {
         }
         return None;
     }
+
+    pub fn len(&self) -> usize {
+        self.directories.len()
+    }
 }
 
 impl<'a> IntoIterator for &'a DirectoryList<'a> {

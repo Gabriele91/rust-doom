@@ -381,7 +381,6 @@ pub mod render_2d {
 }
 
 pub mod render_3d {
-    use std::borrow::Borrow;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::rc::Rc;
@@ -390,7 +389,7 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Sector, Seg, LINEDEF_FLAGS};
+    use crate::map::{Map, Seg, LINEDEF_FLAGS};
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
