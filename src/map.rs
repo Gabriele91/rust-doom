@@ -104,6 +104,17 @@ pub struct Sector {
     pub tag_number: i16
 }
 
+#[repr(packed)]
+#[allow(dead_code)]
+#[derive(Debug)]
+#[readonly::make]
+pub struct Blockmaps {
+    pub x: i16,
+    pub y: i16,
+    pub columns: i16,
+    pub row: i16
+}
+
 #[allow(dead_code)]
 #[repr(usize)]
 pub enum MAPLUMPSINDEX {
@@ -118,6 +129,19 @@ pub enum MAPLUMPSINDEX {
     REJECT = 9,
     BLOCKMAP = 10,
     COUNT = 11
+}
+
+pub struct MapLumpIndexs {
+    things: Option<usize>,
+    linedefs: Option<usize>,
+    sideddefs: Option<usize>,
+    vertexes: Option<usize>,
+    segs: Option<usize>,
+    ssectors: Option<usize>,
+    nodes: Option<usize>,
+    sectors: Option<usize>,
+    reject: Option<usize>,
+    blockmap: Option<usize>,
 }
 
 #[repr(u16)]
@@ -142,9 +166,9 @@ pub struct Map<'a> {
     pub side_defs: Vec<&'a SideDef>,
     pub vertices: Vec<&'a Vertex>,
     pub segs: Vec<&'a Seg>,
-    pub sectors: Vec<&'a Sector>,
     pub sub_sectors: Vec<&'a SubSector>,
-    pub nodes: Vec<&'a Node>
+    pub nodes: Vec<&'a Node>,
+    pub sectors: Vec<&'a Sector>,
 }
 
 impl LINEDEF_FLAGS {
@@ -156,6 +180,56 @@ impl LINEDEF_FLAGS {
 impl MAPLUMPSINDEX {
     pub fn value(self) -> usize {
         self as usize
+    }
+
+    pub fn as_name(&self) -> &[u8; 8] {
+        match self {
+            MAPLUMPSINDEX::THINGS    => &b"THINGS\0\0",
+            MAPLUMPSINDEX::LINEDEFS  => &b"LINEDEFS",
+            MAPLUMPSINDEX::SIDEDDEFS => &b"SIDEDEFS",
+            MAPLUMPSINDEX::VERTEXES  => &b"VERTEXES",
+            MAPLUMPSINDEX::SEGS      => &b"SEGS\0\0\0\0",
+            MAPLUMPSINDEX::SSECTORS  => &b"SSECTORS",
+            MAPLUMPSINDEX::NODES     => &b"NODES\0\0\0",
+            MAPLUMPSINDEX::SECTORS   => &b"SECTORS\0",
+            MAPLUMPSINDEX::REJECT    => &b"REJECT\0\0",
+            MAPLUMPSINDEX::BLOCKMAP  => &b"BLOCKMAP",
+            MAPLUMPSINDEX::COUNT     => &b"--------",
+        }
+    }
+}
+
+fn map_lump_indexs_get_id(directories: &wad::DirectoryList, map_lump_id: usize, name:&[u8;8]) -> Option<usize> {
+    for lump_id in map_lump_id+1..directories.len() {
+        // If a lump has size 0 or follows the map naming convention (e.g., MAPxx or ExMx),
+        // it is a new map, so the following lumps are not associated with the input map.
+        if directories[lump_id].lump_size == 0 && (
+            directories[lump_id].lump_name.starts_with(b"MAP") || 
+            (directories[lump_id].lump_name[0] == b'E' && directories[lump_id].lump_name[2] == b'M')
+        ) {
+            return None;
+        }
+        else if directories[lump_id].lump_name == *name {
+            return Some(lump_id);
+        }
+    }
+    return None;
+}
+
+impl MapLumpIndexs {
+    pub fn new(directories: &wad::DirectoryList, map_lump_id: usize) -> Self {
+        MapLumpIndexs {
+            things: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::THINGS.as_name()),
+            linedefs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::LINEDEFS.as_name()),
+            sideddefs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SIDEDDEFS.as_name()),
+            vertexes: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::VERTEXES.as_name()),
+            segs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SEGS.as_name()),
+            ssectors: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SSECTORS.as_name()),
+            nodes: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::NODES.as_name()),
+            sectors: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SECTORS.as_name()),
+            reject: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::REJECT.as_name()),
+            blockmap: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::BLOCKMAP.as_name()),
+        }
     }
 }
 
@@ -278,27 +352,55 @@ impl<'a> Map<'a> {
                     side_defs: vec![], 
                     vertices: vec![], 
                     segs: vec![], 
-                    sectors: vec![], 
                     sub_sectors: vec![],  
                     nodes: vec![], 
+                    sectors: vec![], 
                 };
-                map.things = map.extract::<Thing>(&directories[map_dir_id + MAPLUMPSINDEX::THINGS as usize]);
-                map.line_defs = map.extract::<LineDef>(&directories[map_dir_id + MAPLUMPSINDEX::LINEDEFS as usize]);
-                map.side_defs = map.extract::<SideDef>(&directories[map_dir_id + MAPLUMPSINDEX::SIDEDDEFS as usize]);
-                map.vertices = map.extract::<Vertex>(&directories[map_dir_id + MAPLUMPSINDEX::VERTEXES as usize]);
-                map.segs = map.extract::<Seg>(&directories[map_dir_id + MAPLUMPSINDEX::SEGS as usize]);
-                map.sectors = map.extract::<Sector>(&directories[map_dir_id + MAPLUMPSINDEX::SECTORS as usize]);
-                map.sub_sectors = map.extract::<SubSector>(&directories[map_dir_id + MAPLUMPSINDEX::SSECTORS as usize]);
-                map.nodes = map.extract::<Node>(&directories[map_dir_id + MAPLUMPSINDEX::NODES as usize]);
-                return Some(map)
+    
+                let indexes = MapLumpIndexs::new(&directories, map_dir_id);
+    
+                if let Some(index) = indexes.things {
+                    map.things = map.extract::<Thing>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.linedefs {
+                    map.line_defs = map.extract::<LineDef>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.sideddefs {
+                    map.side_defs = map.extract::<SideDef>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.vertexes {
+                    map.vertices = map.extract::<Vertex>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.segs {
+                    map.segs = map.extract::<Seg>(&directories[index]);
+                }
+
+                if let Some(index) = indexes.ssectors {
+                    map.sub_sectors = map.extract::<SubSector>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.nodes {
+                    map.nodes = map.extract::<Node>(&directories[index]);
+                }
+    
+                if let Some(index) = indexes.sectors {
+                    map.sectors = map.extract::<Sector>(&directories[index]);
+                }
+    
+                return Some(map);
             }
         }
-        return None
+        return None;
     }
+    
 
     fn extract<T>(&self, directory: &wad::Directory) -> Vec<&'a T> {
         let buffer = &self.reader.buffer;
-        let mut vec_t = vec![];   
+        let mut vec_t = vec![];
         for chunk_offset in directory.data::<T>() {
             let value: &'a T = unsafe { mem::transmute(&buffer[chunk_offset]) };
             vec_t.push(value);

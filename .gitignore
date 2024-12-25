@@ -6,3 +6,4 @@ src/prebuild/**
 *.lock
 # Doom
 *.WAD
+*.bak
