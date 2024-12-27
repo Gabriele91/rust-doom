@@ -70,7 +70,7 @@ impl Directory {
         let chunk_size = mem::size_of::<T>() as usize;
         (self.start()..self.end()).step_by(chunk_size)
     }
-
+    
     pub fn start(&self) -> usize {
         self.lump_offset as usize
     }
