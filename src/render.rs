@@ -389,7 +389,7 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Seg, LINEDEF_FLAGS};
+    use crate::map::{Map, Seg, SideDef, LINEDEF_FLAGS};
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
@@ -474,15 +474,17 @@ pub mod render_3d {
                                         .and_then(|sector| self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.ceiling_texture)),
                     upper_texture_id: {
                         let line = seg.line_defs(&self.map);
+                        let find_id_upper = |side: &SideDef| {
+                            if side.upper_texture != consts::VOID_TEXTURE {  
+                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.upper_texture)
+                            } else {
+                                None
+                            }
+                        };
                         line
                         .front_side(&self.map)
-                        .and_then(|side| {
-                            if side.upper_texture != consts::VOID_TEXTURE {  
-                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.upper_texture) } 
-                            else { 
-                                None 
-                            }
-                        })
+                        .and_then(find_id_upper)
+                        .or( line.back_side(&self.map).and_then(find_id_upper))
                     },
                     wall_texture_id: {
                         let line = seg.line_defs(&self.map);
@@ -498,15 +500,17 @@ pub mod render_3d {
                     },
                     lower_texture_id: {
                         let line = seg.line_defs(&self.map);
-                        line
-                        .front_side(&self.map)
-                        .and_then(|side| { 
+                        let find_id_lower = |side: &SideDef| {
                             if side.lower_texture != consts::VOID_TEXTURE {  
-                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.lower_texture)  
+                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.lower_texture)
                             } else {
                                 None
                             }
-                        })
+                        };
+                        line
+                        .front_side(&self.map)
+                        .and_then(find_id_lower)
+                        .or( line.back_side(&self.map).and_then(find_id_lower))
                     },
                     floor_texture_id: seg
                                       .front_sector(&self.map)
