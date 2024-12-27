@@ -2,10 +2,8 @@
 use std::ops::Range;
 use std::{mem, vec};
 use std::rc::Rc;
-use lazy_static::lazy_static;
-
 use crate::math::{Vector2, Vector4};
-use crate::wad;
+use crate::wad::{self, Directory};
 
 // Consts
 const DOOM_BAM_SCALE : f64 = 360.0 / 4294967296.0; // 8.38190317e-8
@@ -108,11 +106,19 @@ pub struct Sector {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
-pub struct Blockmaps {
+pub struct BlockmapsHeader {
     pub x: i16,
     pub y: i16,
-    pub columns: i16,
-    pub row: i16
+    pub columns: u16,
+    pub row: u16
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+#[readonly::make]
+pub struct Blockmaps<'a> {
+    pub header: &'a BlockmapsHeader,
+    pub metrix_lines: Vec<Rc<Vec<&'a LineDef>>>
 }
 
 #[allow(dead_code)]
@@ -169,6 +175,7 @@ pub struct Map<'a> {
     pub sub_sectors: Vec<&'a SubSector>,
     pub nodes: Vec<&'a Node>,
     pub sectors: Vec<&'a Sector>,
+    pub blockmaps: Option<Rc< Blockmaps<'a> >>
 }
 
 impl LINEDEF_FLAGS {
@@ -341,6 +348,91 @@ impl Seg {
     }
 }
 
+impl<'a> Blockmaps<'a> {
+    fn new(directory: &Directory, line_defs: &Vec<&'a LineDef>, buffer:&Vec<u8>) -> Result<Self,String> {
+        // Test
+        if directory.size() < std::mem::size_of::<BlockmapsHeader>() {
+            return Err(String::from("Invalid blockmaps.header"));
+        }
+        //
+        let mut offset = directory.start();
+        // Get header
+        let header: &'a BlockmapsHeader =  unsafe{ mem::transmute(&buffer[offset]) };
+        // Cast values
+        let columns = header.columns as usize;
+        let rows = header.row as usize;
+        // Test header size
+        assert!(std::mem::size_of::<BlockmapsHeader>() == 8);
+        // Advance
+        offset += std::mem::size_of::<BlockmapsHeader>();
+        // Compute metrix size 
+        let matrix_size = columns * rows;
+        Ok(Blockmaps {
+            header: header,
+            metrix_lines: {
+                let mut metrix: Vec<u16> = Vec::with_capacity(matrix_size);
+                for _ in 0..matrix_size {
+                    // Test
+                    if offset >= directory.end() {
+                        return Err(String::from("Invalid blockmaps.offsets"));
+                    }
+                    // Get offset
+                    let list_offset: &u16 = unsafe{ mem::transmute(&buffer[offset]) };
+                    metrix.push( *list_offset );
+                    offset += std::mem::size_of::<u16>();
+                }
+                let mut metrix_lines: Vec<Rc<Vec<&'a LineDef>>> = vec![Rc::new(vec![]);matrix_size];
+                for y in 0..rows {
+                    for x in 0..columns {
+                        let list_relative_offset =  metrix[columns * y + x] as usize * std::mem::size_of::<u16>();
+                        let mut list_value_offset = directory.start() + list_relative_offset;
+                        // List
+                        let mut line_def_list: Vec<&'a LineDef> = Vec::new();
+                        // Loop until 0xFF
+                        loop {
+                            // Test size
+                            if list_value_offset >= directory.end() {
+                                return Err(format!("Invalid blocklists x: {}, y: {}", x, y));
+                            }
+                            // Get ID
+                            let value:&u16 = unsafe{ mem::transmute(&buffer[list_value_offset]) };
+                            if *value == 0xFFFF { 
+                                break; 
+                            }
+                            let line_def_id = *value as usize;
+                            // Test ID
+                            if line_def_id as usize >= line_defs.len() {
+                                return Err(format!("Invalid blocklist id: {}, x: {}, y: {}, id", line_def_id, x, y));
+                            }
+                            // Save and go ahead
+                            line_def_list.push(line_defs[line_def_id]);
+                            list_value_offset += std::mem::size_of::<u16>();
+                        }
+                        metrix_lines[columns * y + x] = Rc::new(line_def_list);
+                    }
+                }
+                metrix_lines
+            }
+        })
+    }
+    
+    fn get(&self, x: i16,y: i16) -> Option<Rc< Vec<&'a LineDef> >> {
+        let m_x = x as i32 - self.header.x as i32;
+        let m_y = y as i32 - self.header.y as i32;
+        if 0 <= m_x  && m_x < self.header.columns as i32 
+        && 0 <= m_y  && m_y < self.header.row as i32 {
+            let i_x = m_x as usize; 
+            let i_y = m_y as usize; 
+            let columns = self.header.columns as usize; 
+            Some(self.metrix_lines[columns * i_y + i_x].clone())
+        }
+        else {
+            None
+        }
+    }
+
+}
+
 impl<'a> Map<'a> {
     pub fn new(reader: &Rc<wad::Reader>, name: &String) -> Option<Self> {
         if let Some(directories) = reader.directories() {
@@ -355,6 +447,7 @@ impl<'a> Map<'a> {
                     sub_sectors: vec![],  
                     nodes: vec![], 
                     sectors: vec![], 
+                    blockmaps: None
                 };
     
                 let indexes = MapLumpIndexs::new(&directories, map_dir_id);
@@ -389,6 +482,15 @@ impl<'a> Map<'a> {
     
                 if let Some(index) = indexes.sectors {
                     map.sectors = map.extract::<Sector>(&directories[index]);
+                }
+
+                if !map.line_defs.is_empty() {
+                    if let Some(index) = indexes.blockmap {
+                        match Blockmaps::new(&directories[index], &map.line_defs, &map.reader.buffer) {
+                            Ok(blockmaps) => map.blockmaps = Some(Rc::new(blockmaps)),
+                            Err(err) => eprintln!("{}",err),
+                        }
+                    }
                 }
     
                 return Some(map);
