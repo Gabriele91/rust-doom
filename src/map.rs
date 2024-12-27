@@ -110,7 +110,7 @@ pub struct BlockmapsHeader {
     pub x: i16,
     pub y: i16,
     pub columns: u16,
-    pub row: u16
+    pub rows: u16
 }
 
 #[allow(dead_code)]
@@ -241,8 +241,11 @@ impl MapLumpIndexs {
 }
 
 impl LineDef {
+
+    const LINEDEFNULL:u16 = 0xFFFF;
+
     pub fn right_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
-        if self.right_sidedef_id != 0xFFFF {
+        if self.right_sidedef_id != LineDef::LINEDEFNULL {
             return Some(map.side_defs[self.right_sidedef_id as usize]);
         }
         return None;
@@ -253,7 +256,7 @@ impl LineDef {
     }
     
     pub fn left_side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
-        if self.left_sidedef_id != 0xFFFF {
+        if self.left_sidedef_id != LineDef::LINEDEFNULL {
             return Some(map.side_defs[self.left_sidedef_id as usize]);
         }
         return None;
@@ -349,6 +352,10 @@ impl Seg {
 }
 
 impl<'a> Blockmaps<'a> {
+
+    const BLOCKSIZE:i32 = 128;
+    const LINELISTEND:u16 = 0xFFFF;
+
     fn new(directory: &Directory, line_defs: &Vec<&'a LineDef>, buffer:&Vec<u8>) -> Result<Self,String> {
         // Test
         if directory.size() < std::mem::size_of::<BlockmapsHeader>() {
@@ -360,7 +367,7 @@ impl<'a> Blockmaps<'a> {
         let header: &'a BlockmapsHeader =  unsafe{ mem::transmute(&buffer[offset]) };
         // Cast values
         let columns = header.columns as usize;
-        let rows = header.row as usize;
+        let rows = header.rows as usize;
         // Test header size
         assert!(std::mem::size_of::<BlockmapsHeader>() == 8);
         // Advance
@@ -396,7 +403,7 @@ impl<'a> Blockmaps<'a> {
                             }
                             // Get ID
                             let value:&u16 = unsafe{ mem::transmute(&buffer[list_value_offset]) };
-                            if *value == 0xFFFF { 
+                            if *value == Blockmaps::LINELISTEND { 
                                 break; 
                             }
                             let line_def_id = *value as usize;
@@ -415,18 +422,25 @@ impl<'a> Blockmaps<'a> {
             }
         })
     }
+
+    pub fn get(&self, x: i16, y: i16) -> Option<Rc<Vec<&'a LineDef>>> {
+        // Calculate the offset relative to the blockmap origin
+        let m_x = (x as i32 - self.header.x as i32) / Blockmaps::BLOCKSIZE;
+        let m_y = (y as i32 - self.header.y as i32) / Blockmaps::BLOCKSIZE;
     
-    fn get(&self, x: i16,y: i16) -> Option<Rc< Vec<&'a LineDef> >> {
-        let m_x = x as i32 - self.header.x as i32;
-        let m_y = y as i32 - self.header.y as i32;
-        if 0 <= m_x  && m_x < self.header.columns as i32 
-        && 0 <= m_y  && m_y < self.header.row as i32 {
-            let i_x = m_x as usize; 
-            let i_y = m_y as usize; 
-            let columns = self.header.columns as usize; 
+        // Check if the coordinates are within the blockmap bounds
+        if m_x >= 0 && m_x < (self.header.columns as i32)
+        && m_y >= 0 && m_y < (self.header.rows as i32)
+        {
+            // Calculate block indices based on the blockmap grid size (128x128 units per block)
+            let i_x = m_x as usize; // Convert absolute units to block indices
+            let i_y = m_y as usize;
+    
+            let columns = self.header.columns as usize;
+            // Return the reference to the linedefs in the specified block
             Some(self.metrix_lines[columns * i_y + i_x].clone())
-        }
-        else {
+        } else {
+            // Return None if the point is outside the blockmap boundaries
             None
         }
     }
