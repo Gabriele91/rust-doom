@@ -29,6 +29,7 @@ pub struct Player {
 
 pub struct Map {
     pub name: String,
+    pub blockmap_no_first_line: bool
 }
 
 pub struct Render {
@@ -142,6 +143,7 @@ impl Map {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Map { 
             name: String::from(props.get("name")?),
+            blockmap_no_first_line: bool_from_str(props.get("blockmap_no_first_line")).unwrap_or(false),
         })
     }
 }

@@ -2,6 +2,7 @@
 use std::ops::Range;
 use std::{mem, vec};
 use std::rc::Rc;
+use crate::configure;
 use crate::math::{Vector2, Vector4};
 use crate::wad::{self, Directory};
 
@@ -354,9 +355,10 @@ impl Seg {
 impl<'a> Blockmaps<'a> {
 
     const BLOCKSIZE:i32 = 128;
+    const LINELISTSTART:u16 = 0x0;
     const LINELISTEND:u16 = 0xFFFF;
 
-    fn new(directory: &Directory, line_defs: &Vec<&'a LineDef>, buffer:&Vec<u8>) -> Result<Self,String> {
+    fn new(directory: &Directory, line_defs: &Vec<&'a LineDef>, buffer:&Vec<u8>, no_first_line: bool) -> Result<Self,String> {
         // Test
         if directory.size() < std::mem::size_of::<BlockmapsHeader>() {
             return Err(String::from("Invalid blockmaps.header"));
@@ -395,11 +397,25 @@ impl<'a> Blockmaps<'a> {
                         let mut list_value_offset = directory.start() + list_relative_offset;
                         // List
                         let mut line_def_list: Vec<&'a LineDef> = Vec::new();
+                        // Jump first index
+                        if no_first_line {
+                            // Test size
+                            if list_value_offset >= directory.end() {
+                                return Err(format!("Invalid blocklists at x: {}, y: {}", x, y));
+                            }
+                            // Get ID
+                            let value:&u16 = unsafe{ mem::transmute(&buffer[list_value_offset]) };
+                            if *value != Blockmaps::LINELISTSTART {
+                                return Err(format!("Invalid blocklists start (not 0) at x: {}, y: {}", x, y));
+                            }
+                            // go ahead
+                            list_value_offset += std::mem::size_of::<u16>();
+                        }
                         // Loop until 0xFF
                         loop {
                             // Test size
                             if list_value_offset >= directory.end() {
-                                return Err(format!("Invalid blocklists x: {}, y: {}", x, y));
+                                return Err(format!("Invalid blocklists at x: {}, y: {}", x, y));
                             }
                             // Get ID
                             let value:&u16 = unsafe{ mem::transmute(&buffer[list_value_offset]) };
@@ -409,7 +425,7 @@ impl<'a> Blockmaps<'a> {
                             let line_def_id = *value as usize;
                             // Test ID
                             if line_def_id as usize >= line_defs.len() {
-                                return Err(format!("Invalid blocklist id: {}, x: {}, y: {}, id", line_def_id, x, y));
+                                return Err(format!("Invalid blocklist id: {} at x: {}, y: {}", line_def_id, x, y));
                             }
                             // Save and go ahead
                             line_def_list.push(line_defs[line_def_id]);
@@ -448,9 +464,9 @@ impl<'a> Blockmaps<'a> {
 }
 
 impl<'a> Map<'a> {
-    pub fn new(reader: &Rc<wad::Reader>, name: &String) -> Option<Self> {
+    pub fn new(reader: &Rc<wad::Reader>, configure: &configure::Map) -> Option<Self> {
         if let Some(directories) = reader.directories() {
-            if let Some(map_dir_id) = directories.index_of(&name) {
+            if let Some(map_dir_id) = directories.index_of(&configure.name) {
                 let mut map = Map {
                     reader: reader.clone(),
                     things: vec![], 
@@ -500,7 +516,7 @@ impl<'a> Map<'a> {
 
                 if !map.line_defs.is_empty() {
                     if let Some(index) = indexes.blockmap {
-                        match Blockmaps::new(&directories[index], &map.line_defs, &map.reader.buffer) {
+                        match Blockmaps::new(&directories[index], &map.line_defs, &map.reader.buffer, configure.blockmap_no_first_line) {
                             Ok(blockmaps) => map.blockmaps = Some(Rc::new(blockmaps)),
                             Err(err) => eprintln!("{}",err),
                         }
