@@ -224,8 +224,8 @@ pub mod render_2d {
         }
 
     }
-    // Render 2D bsp
     
+    // Render 2D Camera
     #[derive(Clone)]
     pub struct RenderCamera<'wad> {
         map: Rc<Map<'wad>>,
@@ -310,6 +310,68 @@ pub mod render_2d {
                 },
                 None => ()
             } 
+        }
+
+    }
+
+        // Render 2D Camera
+    #[derive(Clone)]
+    pub struct RenderCollision<'wad> {
+        map: Rc<Map<'wad>>,
+        bounds: [Vector2<i16>; 2],
+        size: Vector2<i32>,
+        offset: Vector2<i32>
+    }
+
+    impl<'wad> RenderCollision<'wad> {
+        pub fn new(map: &Rc<Map<'wad>>, size: Vector2<i32>, offset: Vector2<i32>) -> Self {
+            let bounds = utils::bound_from_vertices(&map.vertices);
+            RenderCollision {
+                map: map.clone(),
+                bounds: bounds,
+                size: size,
+                offset: offset,
+            }
+        }
+
+        fn draw_line(&self, surface: &mut DoomSurface, v1: &Vector2<i16>, v2: &Vector2<i16>, color: &[u8]){
+            let remapv1 = utils::remap_vertex(
+                &v1, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            let remapv2 = utils::remap_vertex(
+                &v2, 
+                &self.bounds, 
+                &self.offset, 
+                &self.size
+            );
+            surface.draw_line_lb(&remapv1, &remapv2, color);
+        }
+    }
+
+    impl crate::render::Render for RenderCollision<'_> {
+        fn draw<'wad>(&mut self, doom: &mut Doom<'wad>, _last_frame_time: f64, _blending_factor: f64) {
+            // Ref to bsp
+            let surface = doom.surface.clone();
+            let render = self;
+            // Draw player 1
+            match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
+                Some(actor) => {
+                    if let Some(map) = &doom.map.blockmaps {
+                        let position= actor.borrow().position().clone();
+                        if let Some(list_lines) = map.get(position.x, position.y) {
+                            for line in list_lines.iter() {
+                                let vertex1 = line.start_vertex(&doom.map);
+                                let vertex2 = line.end_vertex(&doom.map);
+                                render.draw_line(&mut surface.borrow_mut(), &vertex1, &vertex2, &[0xFF,0xC0, 0xCB, 0xFF]);
+                            }
+                        }
+                    }
+                },
+                None => ()
+            }
         }
 
     }

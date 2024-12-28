@@ -33,7 +33,8 @@ pub struct Map {
 
 pub struct Render {
     pub map_2d: Option<Vector4<i32>>, 
-    pub bsp_2d: Option<Vector4<i32>>, 
+    pub bsp_2d: Option<Vector4<i32>>,
+    pub collision_2d: Option<Vector4<i32>>,
     pub camera_2d: Option<Vector4<i32>>, 
     pub flat_2d: Option<Vector4<i32>>, 
     pub sprite_2d: Option<Vector4<i32>>, 
@@ -163,6 +164,7 @@ impl Render {
             Some(props) => Some(Render { 
                 map_2d: Vector4::<i32>::from_optional_str(props.get("map_2d")),
                 bsp_2d: Vector4::<i32>::from_optional_str(props.get("bsp_2d")),
+                collision_2d: Vector4::<i32>::from_optional_str(props.get("collision_2d")),
                 camera_2d: Vector4::<i32>::from_optional_str(props.get("camera_2d")),
                 flat_2d: Vector4::<i32>::from_optional_str(props.get("flat_2d")),
                 sprite_2d: Vector4::<i32>::from_optional_str(props.get("sprite_2d")),
