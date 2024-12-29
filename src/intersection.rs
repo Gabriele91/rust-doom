@@ -1,77 +1,170 @@
 #![allow(dead_code)]
-use num_traits::Float;
-use crate::math::Vector2;
+use num_traits::{Float, NumCast};
+use crate::{map::{LineDef, Map}, math::Vector2};
 
-pub enum Result<T:Float> {
-    NOCOLLIDE,
-    COLLIDE(T,Vector2<T>)
+
+mod aabb_utils {
+    use crate::math::Vector2;
+    use num_traits::Float;
+    use std::cmp::{min, max};
+
+    // Check if a point is inside the AABB
+    fn point_in_aabb<T: Float>(p: &Vector2<T>, aabb_position: &Vector2<T>, size: T) -> bool {
+        let left = aabb_position.x - size;
+        let right = aabb_position.x + size;
+        let top = aabb_position.y + size;
+        let bottom = aabb_position.y - size;
+
+        p.x >= left && p.x <= right && p.y >= bottom && p.y <= top
+    }
+
+    // Check if a line segment intersects a vertical line at x
+    fn intersects_vertical_segment<T: Float + Ord + Copy>(p1: &Vector2<T>, p2: &Vector2<T>, x: T) -> bool {
+        if p1.x == p2.x { return false; }
+        
+        // Ensure the line crosses the vertical line at `x`
+        let t = (x - p1.x) / (p2.x - p1.x);
+        let y_intersection = p1.y + t * (p2.y - p1.y);
+        
+        min(p1.y, p2.y) <= y_intersection && y_intersection <= max(p1.y, p2.y)
+    }
+
+    // Check if a line segment intersects a horizontal line at y
+    fn intersects_horizontal_segment<T: Float + Ord + Copy>(p1: &Vector2<T>, p2: &Vector2<T>, y: T) -> bool {
+        if p1.y == p2.y { return false; }
+        
+        // Ensure the line crosses the horizontal line at `y`
+        let t = (y - p1.y) / (p2.y - p1.y);
+        let x_intersection = p1.x + t * (p2.x - p1.x);
+        
+        min(p1.x, p2.x) <= x_intersection && x_intersection <= max(p1.x, p2.x)
+    }
+
+    // Main function to check if the AABB and line segment intersect
+    fn aabb_intersects_segment<T: Float + Ord + Copy>(aabb_position: Vector2<T>, size: T, p1: Vector2<T>, p2: Vector2<T>) -> bool {
+        // Step 1: Check if either endpoint of the segment is inside the AABB
+        if point_in_aabb(&p1, &aabb_position, size) || point_in_aabb(&p2, &aabb_position, size) {
+            return true;
+        }
+        
+        // Step 2: Check intersection with each of the AABB sides
+        // Left side
+        if intersects_vertical_segment(&p1, &p2, aabb_position.x - size) {
+            return true;
+        }
+        // Right side
+        if intersects_vertical_segment(&p1, &p2, aabb_position.x + size) {
+            return true;
+        }
+        // Top side
+        if intersects_horizontal_segment(&p1, &p2, aabb_position.y + size) {
+            return true;
+        }
+        // Bottom side
+        if intersects_horizontal_segment(&p1, &p2, aabb_position.y - size) {
+            return true;
+        }
+        
+        false
+    }
 }
 
-pub struct Sphere<T:Float> {
-    center: Vector2<T>,
+/// Attempts to move an object while handling collisions with line segments
+pub fn try_move<'a, T: Float + Sized + Copy + NumCast + Default>(
+    position: &Vector2<T>,
+    velocity: &Vector2<T>,
     radius: T,
-}
+    map: &Map<'a>,
+    line: &LineDef,
+) -> Vector2<T> {
+    // Get line segment points
+    let start = Vector2::<T>::from(&line.end_vertex(&map));
+    let end = Vector2::<T>::from(&line.start_vertex(&map));
 
-pub struct Segment<T: Float> {
-    start: Vector2<T>,
-    end: Vector2<T>,
-}
-
-impl<T: Float> Segment<T> {
-    pub fn magnitude(&self) -> T {
-        self.start.distance(&self.end)
+    // Calculate wall direction and normal
+    let wall_vec = end - start;
+    let wall_length = wall_vec.magnitude();
+    
+    if wall_length < T::epsilon() {
+        return *velocity;
     }
 
-    pub fn direction(&self) -> Vector2<T> {
-        self.end - self.start
+    let wall_dir = wall_vec.normalize();
+    let wall_normal = Vector2::new(-wall_dir.y, wall_dir.x);
+
+    // Check distance to wall
+    let to_wall = *position - start;
+    let perp_dist = to_wall.dot(&wall_normal);
+
+    // DOOM-style collision check:
+    // 1. Only check if we're within collision range
+    if perp_dist.abs() > radius + T::from(1.0).unwrap() {
+        return *velocity;
     }
 
-    pub fn normalized_direction(&self) -> Vector2<T> {
-        self.direction().normalize()
+    // 2. Project current position onto wall line
+    let along_wall = to_wall.dot(&wall_dir);
+    
+    // 3. Check if we're actually near the wall segment
+    if along_wall < -radius || along_wall > wall_length + radius {
+        return *velocity;
     }
+
+    // 4. Check if we're moving towards the wall
+    let vel_towards_wall = velocity.dot(&wall_normal);
+    if vel_towards_wall >= T::zero() {
+        return *velocity;
+    }
+
+    // DOOM-style response:
+    // 1. If we're too close or inside, push out
+    let min_dist = radius + T::from(0.01).unwrap();  // Small buffer
+    if perp_dist.abs() < min_dist {
+        let push_out = wall_normal * (min_dist - perp_dist.abs());
+        
+        // 2. Split velocity into parallel and perpendicular components
+        let vel_parallel = wall_dir * velocity.dot(&wall_dir);
+        
+        // 3. DOOM keeps the parallel component (sliding) and removes the perpendicular
+        // Also apply the push-out correction
+        return vel_parallel + push_out;
+    }
+
+    // If we're just moving towards wall but not too close yet,
+    // do DOOM-style sliding
+    let vel_parallel = wall_dir * velocity.dot(&wall_dir);
+    vel_parallel
 }
 
-// Function to check the collision between the sphere and sphere
-pub fn sphere_vs_sphere<T: Float>(sphere1: &Sphere<T>, sphere2: &Sphere<T>) -> Result<T> {
-    let radius_total = sphere1.radius + sphere2.radius;
-    let square_dist = sphere1.center.dot(&sphere2.center);
-    let direction = sphere2.center - sphere1.center;
+fn ray_intersects_segment<T: Float>(
+    p1: &Vector2<T>,
+    p2: &Vector2<T>,
+    q1: &Vector2<T>,
+    q2: &Vector2<T>
+) -> Option<Vector2<T>> {
+    // Calculate the direction vectors of the segments
+    let r = *p2 - *p1; // Vector for the first segment
+    let s = *q2 - *q1; // Vector for the second segment
 
-    if square_dist < radius_total * radius_total {
-        let penetration_depth = radius_total - direction.magnitude();
-        let normalized_direction = direction.normalize();
-        Result::COLLIDE(penetration_depth, normalized_direction)
-    } else {
-        Result::NOCOLLIDE // No collision
+    // Calculate the determinant
+    let det = -r.x * s.y + r.y * s.x;
+
+    if !det.is_zero() {
+        // Parametric equations to find t1 and t2
+        let t1 = ((q1.x - p1.x) * s.y - (q1.y - p1.y) * s.x) / det;
+        let t2 = ((p1.x - q1.x) * r.y - (p1.y - q1.y) * r.x) / det;
+
+        // Check if t1 and t2 lie within the bounds [0, 1] (i.e., intersection is within the segments)
+        if  t1 >= T::zero() && t1 <= T::one()
+         && t2 >= T::zero() && t2 <= T::one() {
+            // Compute the intersection point
+            let newpoint = *p1 + r * t1;
+            return Some(newpoint);
+        }
     }
+    // None
+    return None;
+    
 }
 
-// Function to check the collision between the sphere and segment
-pub fn sphere_vs_segment<T: Float>(sphere:&Sphere<T>, segment: &Segment<T>) -> Result<T> {
-    // Calculate the vector from the sphere's center to the segment's start point
-    let segment_dir = segment.direction(); // Get the direction of the segment
-    let sphere_to_start = sphere.center - segment.start;
 
-    // Project the vector from the sphere center to the segment's start onto the segment direction
-    let t = sphere_to_start.dot(&segment_dir) / segment_dir.dot(&segment_dir);
-
-    // Clamp the value of t to the bounds of the segment [0, 1]
-    let t_clamped = t.max(T::zero()).min(T::one());
-
-    // Calculate the closest point on the segment to the sphere's center
-    let closest_point = segment.start + segment_dir * t_clamped;
-
-    // Calculate the distance squared from the closest point to the sphere's center
-    let dist_squared = sphere.center.dot(&closest_point);
-
-    // Check if the sphere's radius is greater than the distance to the closest point
-    if dist_squared < sphere.radius * sphere.radius {
-        // If so, there's a collision
-        let direction = closest_point - sphere.center; // Direction from sphere to collision point
-        let magnitude = direction.magnitude(); // Calculate the magnitude of the collision vector
-        let normalized_direction = direction.normalize(); // Normalize the direction vector
-        Result::COLLIDE(magnitude, normalized_direction)
-    } else {
-        Result::NOCOLLIDE
-    }
-}

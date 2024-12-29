@@ -39,6 +39,13 @@ impl<T : Sized + Copy + NumCast + Default> Vector2<T> {
             y: NumCast::from(vec.y).unwrap_or_default(),
         }
     }
+
+    pub fn to<U: Sized + Copy + NumCast + Default>(&self) -> Vector2<U> {
+        Vector2::<U>{ 
+            x: NumCast::from(self.x).unwrap_or_default(),
+            y: NumCast::from(self.y).unwrap_or_default(),
+        }
+    }
 }
 
 impl<T: Float> Vector2<T> {
@@ -195,6 +202,14 @@ impl<T : Sized + Copy + NumCast + Default> Vector3<T> {
             x: NumCast::from(vec.x).unwrap_or_default(),
             y: NumCast::from(vec.y).unwrap_or_default(),
             z: NumCast::from(vec.z).unwrap_or_default(),
+        }
+    }
+
+    pub fn to<U: Sized + Copy + NumCast + Default>(&self) -> Vector3<U> {
+        Vector3::<U>{ 
+            x: NumCast::from(self.x).unwrap_or_default(),
+            y: NumCast::from(self.y).unwrap_or_default(),
+            z: NumCast::from(self.z).unwrap_or_default(),
         }
     }
 }
@@ -425,6 +440,15 @@ impl<T : Sized + Copy + NumCast + Default> Vector4<T> {
             y: NumCast::from(vec.y).unwrap_or_default(),
             z: NumCast::from(vec.z).unwrap_or_default(),
             w: NumCast::from(vec.w).unwrap_or_default(),
+        }
+    }
+
+    pub fn to<U: Sized + Copy + NumCast + Default>(&self) -> Vector4<U> {
+        Vector4::<U>{ 
+            x: NumCast::from(self.x).unwrap_or_default(),
+            y: NumCast::from(self.y).unwrap_or_default(),
+            z: NumCast::from(self.z).unwrap_or_default(),
+            w: NumCast::from(self.w).unwrap_or_default(),
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::math::{Vector2, normalize_degrees, radians};
 use crate::map::Thing;
 use crate::doom::Doom;
 use crate::configure::Configure;
-
+use crate::intersection::try_move;
 // Utils
 use std::boxed::Box;
 use winit::keyboard::KeyCode;
@@ -96,11 +96,23 @@ impl Actor for Player {
             // Move rotation
             let psin = radians(self.internal_angle - 90.0).sin();
             let pcos = radians(self.internal_angle - 90.0).cos();
-            // New position
-            self.internal_position += Vector2::new(
+            // Delta
+            let mut delta = Vector2::new(
                 direction.x * pcos - direction.y * psin,
                 direction.x * psin + direction.y * pcos,
             ) * self.speed;
+            // Collision
+            if let Some(ref map) = engine.map.blockmaps {
+                if let Some(list_lines) = map.get(self.position.x, self.position.y) {
+                    for line in list_lines.iter() {
+                        if (line.flag & 0x0001) != 0 {
+                            delta = try_move(&self.internal_position, &delta, 20.0, &engine.map, &line);
+                        }
+                    }
+                }
+            }
+            // New position
+            self.internal_position += delta;
         }
         self.position = Vector2::<i16>::from(&self.internal_position.round());
         // Height
