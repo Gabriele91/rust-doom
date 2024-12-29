@@ -2,6 +2,7 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
+use crate::intersection::CollisionSolver;
 use crate::render::{
     render_2d::{RenderBSP, RenderCamera, RenderMap, RenderCollision, RenderTextures},
     render_3d::RenderSoftware,
@@ -33,6 +34,7 @@ pub struct Doom<'wad> {
 
     pub surface: Rc<RefCell<DoomSurface>>,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
+    pub collider: Rc<RefCell<CollisionSolver<'wad>>>
 }
 
 macro_rules! crea_render {
@@ -136,13 +138,13 @@ impl<'wad> Doom<'wad> {
                 }
                 renders
             },
+            collider: Rc::new(RefCell::new(CollisionSolver::new(&map)))
         })
     }
 
     pub fn update(&mut self, last_frame_time: f64, blending_factor: f64) {
-        for actor in &self.actors {
-            actor.borrow_mut().update(self, last_frame_time, blending_factor);
-        }
+        let collider = self.collider.clone();
+        collider.borrow_mut().update(self, last_frame_time, blending_factor);
     }
 
     pub fn draw(&mut self, last_frame_time: f64, blending_factor: f64) {

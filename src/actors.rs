@@ -4,15 +4,23 @@ use crate::math::{Vector2, normalize_degrees, radians};
 use crate::map::Thing;
 use crate::doom::Doom;
 use crate::configure::Configure;
-use crate::intersection::try_move;
 // Utils
 use std::boxed::Box;
 use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
+pub struct Movement {
+    pub position: Vector2<f32>,
+    pub angle: f32,
+    pub height: i16
+}
+
 pub trait Actor {
-    fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64);
+
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64);
+    fn compute<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) -> Movement; 
+    fn apply<'wad>(&mut self, engine: &Doom<'wad>, movement: &Movement);
+
     fn type_id(&self) -> u16;
     fn position(&self) -> &Vector2<i16>;
     fn height(&self) -> &i16;
@@ -32,7 +40,6 @@ pub struct Player {
     // local
     internal_position: Vector2<f32>,
     internal_angle: f32,
-    internal_height: i16,
     // Control
     control_direction: Vector2<f32>, 
     control_angle: f32,
@@ -61,7 +68,6 @@ impl Player {
             // local            
             internal_position: Vector2::<f32>::from(&position),
             internal_angle: thing.angle as f32,
-            internal_height:0,
             // Control
             control_direction: Vector2::zeros(),
             control_angle: 0.0,
@@ -80,15 +86,19 @@ impl Player {
 
 #[allow(unused_variables)]
 impl Actor for Player {
-    fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+    fn compute<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) -> Movement {
+        let mut movement = Movement {
+            position: self.internal_position,
+            angle: self.internal_angle,
+            height: engine.bsp.floor_height(self.position()) + self.player_height
+        };
         // Angle
         if self.control_angle != 0.0 {
             self.control_angle /= self.control_angle_update;
-            self.internal_angle = normalize_degrees(self.internal_angle + (self.control_angle * self.angle_speed));
+            movement.angle = normalize_degrees(self.internal_angle + (self.control_angle * self.angle_speed));
             self.control_angle = 0.0;
             self.control_angle_update = 0.0;
         }
-        self.angle = self.internal_angle.round() as u16;
         // Get move direction
         if self.control_direction.x != 0.0 || self.control_direction.y != 0.0 {
             let direction = self.control_direction.normalize();
@@ -97,24 +107,13 @@ impl Actor for Player {
             let psin = radians(self.internal_angle - 90.0).sin();
             let pcos = radians(self.internal_angle - 90.0).cos();
             // Delta
-            let mut delta = Vector2::new(
+            let velocity = Vector2::new(
                 direction.x * pcos - direction.y * psin,
                 direction.x * psin + direction.y * pcos,
             ) * self.speed;
-            // Collision
-            if let Some(ref map) = engine.map.blockmaps {
-                if let Some(list_lines) = map.get(self.position.x, self.position.y) {
-                    for line in list_lines.iter() {
-                        if (line.flag & 0x0001) != 0 {
-                            delta = try_move(&self.internal_position, &delta, 20.0, &engine.map, &line);
-                        }
-                    }
-                }
-            }
             // New position
-            self.internal_position += delta;
+            movement.position = self.internal_position + velocity;
         }
-        self.position = Vector2::<i16>::from(&self.internal_position.round());
         // Height
         if self.player_jump_lock {
             self.player_jump -= self.player_jump_speed;
@@ -123,8 +122,19 @@ impl Actor for Player {
                 self.player_jump = 0;
             }
         }
-        self.internal_height = engine.bsp.floor_height(self.position());
-        self.height = self.internal_height + self.player_height + self.player_jump;    
+        if 0 < self.player_jump {
+            movement.height += self.player_jump;
+        }
+        // Return
+        return movement;
+    }
+
+    fn apply<'wad>(&mut self, engine: &Doom<'wad>, movement: &Movement) {
+        self.internal_position = movement.position;
+        self.internal_angle = movement.angle;
+        self.position = Vector2::<i16>::from(&movement.position.round());
+        self.angle = movement.angle.round() as u16;
+        self.height = movement.height;  
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
