@@ -12,7 +12,7 @@ mod wad;
 mod window;
 mod camera;
 mod data_textures;
-mod intersection;
+mod collision;
 // Using engine
 use configure::Configure;
 use doom::Doom;

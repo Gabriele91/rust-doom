@@ -3,10 +3,14 @@
 use ini::{Ini, Properties};
 use crate::math::{Vector2, Vector4};
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Resource {
     pub wad : String
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Screen {
     pub title: String,
     pub window: Vector2<f64>, 
@@ -15,23 +19,34 @@ pub struct Screen {
     pub vsync: bool
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Camera {
     pub fov: f32,
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Player {
+    pub size: u16,
+    pub height: i16,
+    // Movement
     pub speed: f32,
     pub angle_speed: f32,
-    pub height: i16,
+    // jump
     pub jump: i16,
     pub jump_speed: i16
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Map {
     pub name: String,
     pub blockmap_no_first_line: bool
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Render {
     pub map_2d: Option<Vector4<i32>>, 
     pub bsp_2d: Option<Vector4<i32>>,
@@ -44,6 +59,7 @@ pub struct Render {
 }
 
 #[readonly::make]
+#[derive(Clone)]
 pub struct Configure {
     pub resource: Resource,
     pub screen: Screen,
@@ -129,10 +145,11 @@ impl Camera {
 
 impl Player {
     pub fn from(props: &Properties) -> Option<Self> {
-        Some(Player { 
+        Some(Player {
+            size: props.get("size")?.parse().ok()?,
+            height: props.get("height")?.parse().ok()?,
             speed: props.get("speed")?.parse().ok()?,
             angle_speed: props.get("angle_speed")?.parse().ok()?,
-            height: props.get("height")?.parse().ok()?,
             jump: props.get("jump")?.parse().ok()?,
             jump_speed: props.get("jump_speed")?.parse().ok()?,
         })

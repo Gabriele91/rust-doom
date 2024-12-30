@@ -2,7 +2,7 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
-use crate::intersection::CollisionSolver;
+use crate::collision::CollisionSolver;
 use crate::render::{
     render_2d::{RenderBSP, RenderCamera, RenderMap, RenderCollision, RenderTextures},
     render_3d::RenderSoftware,
@@ -143,8 +143,12 @@ impl<'wad> Doom<'wad> {
     }
 
     pub fn update(&mut self, last_frame_time: f64, blending_factor: f64) {
-        let collider = self.collider.clone();
-        collider.borrow_mut().update(self, last_frame_time, blending_factor);
+        // Update actors
+        for actor in &self.actors {
+            actor.borrow_mut().update(self, last_frame_time, blending_factor);
+        }
+        // Update collisions
+        self.collider.clone().borrow_mut().update(self, last_frame_time, blending_factor);
     }
 
     pub fn draw(&mut self, last_frame_time: f64, blending_factor: f64) {

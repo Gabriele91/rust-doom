@@ -23,20 +23,25 @@ impl <'wad> CollisionSolver<'wad> {
             // Actor
             let mut actor =  rc_actor.borrow_mut();
             // Move
-            let mut movement = actor.compute(engine, last_frame_time, blending_factor);
+            let old_transformation = actor.get_last_transform();
+            let mut transformation = actor.get_transform().clone();
             // Collision
             if let Some(ref map) = engine.map.blockmaps {
-                let position = actor.position();
+                let position = actor.get_transform().position_as_int();
                 if let Some(list_lines) = map.get(position.x, position.y) {
                     for line in list_lines.iter() {
                         if (line.flag & 0x0001) != 0 {
-                            let float_position = actor.float_position();
-                            movement.position = self.try_move(float_position, &movement.position, 20.0, &engine.map, &line);
+                            transformation.position = self.try_move(
+                                &old_transformation.position(), 
+                                &transformation.position(),
+                                actor.size() as f32, 
+                                &engine.map, 
+                                &line);
                         }
                     }
                 }
             }
-            actor.apply(engine, &movement);
+            actor.set_transform(&transformation);
         }
     }
 
