@@ -145,8 +145,8 @@ impl Camera {
 
 impl Player {
     // Default constants
-    const DEFAULT_SIZE: u16 = 20;
-    const DEFAULT_HEIGHT: i16 = 41;
+    const DEFAULT_SIZE: u16 = 16;
+    const DEFAULT_HEIGHT: i16 = 56;
     const DEFAULT_SPEED: f32 = 1.0;
     const DEFAULT_ANGLE_SPEED: f32 = 0.5;
     const DEFAULT_JUMP: i16 = 10;

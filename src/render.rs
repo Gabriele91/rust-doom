@@ -840,7 +840,7 @@ pub mod render_3d {
                     // Texture height
                     let middle_texture_alt = {
                         if let Some(ref texture) = wall_texture {
-                            if (line.flag & LineDefFlags::DontPegBottom.value()) != 0 { 
+                            if line.has_flag(LineDefFlags::DontPegBottom) { 
                                 wall_floor + texture.size.y as i16 + side.offset.y  
                             } else {
                                 wall_ceiling + side.offset.y  
@@ -1048,7 +1048,7 @@ pub mod render_3d {
                                 wall_center_angle: wall_normal_angle - angle,
                                 upper_texture_alt: {
                                     if b_draw_upper_wall {
-                                        if (line.flag & LineDefFlags::DontPegTop.value()) != 0 { 
+                                        if line.has_flag(LineDefFlags::DontPegTop) { 
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y
@@ -1059,7 +1059,7 @@ pub mod render_3d {
                                 },
                                 lower_texture_alt: {
                                     if b_draw_lower_wall {
-                                        if (line.flag & LineDefFlags::DontPegBottom.value()) != 0 { 
+                                        if line.has_flag(LineDefFlags::DontPegBottom) {
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_floor + side.offset.y  
