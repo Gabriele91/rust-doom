@@ -144,14 +144,34 @@ impl Camera {
 }
 
 impl Player {
+    // Default constants
+    const DEFAULT_SIZE: u16 = 20;
+    const DEFAULT_HEIGHT: i16 = 41;
+    const DEFAULT_SPEED: f32 = 1.0;
+    const DEFAULT_ANGLE_SPEED: f32 = 0.5;
+    const DEFAULT_JUMP: i16 = 10;
+    const DEFAULT_JUMP_SPEED: i16 = 2;
+
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Player {
-            size: props.get("size")?.parse().ok()?,
-            height: props.get("height")?.parse().ok()?,
-            speed: props.get("speed")?.parse().ok()?,
-            angle_speed: props.get("angle_speed")?.parse().ok()?,
-            jump: props.get("jump")?.parse().ok()?,
-            jump_speed: props.get("jump_speed")?.parse().ok()?,
+            size: props.get("size")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_SIZE),
+            height: props.get("height")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_HEIGHT),
+            speed: props.get("speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_SPEED),
+            angle_speed: props.get("angle_speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_ANGLE_SPEED),
+            jump: props.get("jump")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_JUMP),
+            jump_speed: props.get("jump_speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_JUMP_SPEED),
         })
     }
 }
