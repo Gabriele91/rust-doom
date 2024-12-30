@@ -451,7 +451,7 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Seg, SideDef, LINEDEF_FLAGS};
+    use crate::map::{Map, Seg, SideDef, LineDefFlags};
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
@@ -840,7 +840,7 @@ pub mod render_3d {
                     // Texture height
                     let middle_texture_alt = {
                         if let Some(ref texture) = wall_texture {
-                            if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                            if (line.flag & LineDefFlags::DontPegBottom.value()) != 0 { 
                                 wall_floor + texture.size.y as i16 + side.offset.y  
                             } else {
                                 wall_ceiling + side.offset.y  
@@ -1048,7 +1048,7 @@ pub mod render_3d {
                                 wall_center_angle: wall_normal_angle - angle,
                                 upper_texture_alt: {
                                     if b_draw_upper_wall {
-                                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_TOP.value()) != 0 { 
+                                        if (line.flag & LineDefFlags::DontPegTop.value()) != 0 { 
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y
@@ -1059,7 +1059,7 @@ pub mod render_3d {
                                 },
                                 lower_texture_alt: {
                                     if b_draw_lower_wall {
-                                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                                        if (line.flag & LineDefFlags::DontPegBottom.value()) != 0 { 
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_floor + side.offset.y  

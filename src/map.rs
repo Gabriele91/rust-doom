@@ -124,18 +124,18 @@ pub struct Blockmaps<'a> {
 
 #[allow(dead_code)]
 #[repr(usize)]
-pub enum MAPLUMPSINDEX {
-    THINGS = 1,
-    LINEDEFS = 2,
-    SIDEDDEFS = 3,
-    VERTEXES = 4,
-    SEGS = 5,
-    SSECTORS = 6,
-    NODES = 7,
-    SECTORS = 8,
-    REJECT = 9,
-    BLOCKMAP = 10,
-    COUNT = 11
+pub enum MapLumpsIndex {
+    Things = 1,
+    LineDefs = 2,
+    SideDefs = 3,
+    Vertexes = 4,
+    Segs = 5,
+    SubSectors = 6,
+    Nodes = 7,
+    Sectors = 8,
+    Reject = 9,
+    Blockmap = 10,
+    MaxSize = 11
 }
 
 pub struct MapLumpIndexs {
@@ -153,16 +153,16 @@ pub struct MapLumpIndexs {
 
 #[repr(u16)]
 #[warn(non_camel_case_types)]
-pub enum LINEDEF_FLAGS {
-    BLOCKING = 1, 
-    BLOCK_MONSTERS = 2, 
-    TWO_SIDED = 4, 
-    DONT_PEG_TOP = 8,
-    DONT_PEG_BOTTOM = 16, 
-    SECRET = 32, 
-    SOUND_BLOCK = 64, 
-    DONT_DRAW = 128, 
-    MAPPED = 256
+pub enum LineDefFlags {
+    Blocking = 1, 
+    BlockMonsters = 2, 
+    TwoSided = 4, 
+    DontPegTop = 8,
+    DontPegBottom = 16, 
+    Secret = 32,
+    SoundBlock = 64,
+    DontDraw = 128, 
+    Mapped = 256
 }
 
 #[derive(Clone)]
@@ -179,30 +179,30 @@ pub struct Map<'a> {
     pub blockmaps: Option<Rc< Blockmaps<'a> >>
 }
 
-impl LINEDEF_FLAGS {
+impl LineDefFlags {
     pub fn value(self) -> u16 {
         self as u16
     }
 }
 
-impl MAPLUMPSINDEX {
+impl MapLumpsIndex {
     pub fn value(self) -> usize {
         self as usize
     }
 
     pub fn as_name(&self) -> &[u8; 8] {
         match self {
-            MAPLUMPSINDEX::THINGS    => &b"THINGS\0\0",
-            MAPLUMPSINDEX::LINEDEFS  => &b"LINEDEFS",
-            MAPLUMPSINDEX::SIDEDDEFS => &b"SIDEDEFS",
-            MAPLUMPSINDEX::VERTEXES  => &b"VERTEXES",
-            MAPLUMPSINDEX::SEGS      => &b"SEGS\0\0\0\0",
-            MAPLUMPSINDEX::SSECTORS  => &b"SSECTORS",
-            MAPLUMPSINDEX::NODES     => &b"NODES\0\0\0",
-            MAPLUMPSINDEX::SECTORS   => &b"SECTORS\0",
-            MAPLUMPSINDEX::REJECT    => &b"REJECT\0\0",
-            MAPLUMPSINDEX::BLOCKMAP  => &b"BLOCKMAP",
-            MAPLUMPSINDEX::COUNT     => &b"--------",
+            MapLumpsIndex::Things    => &b"THINGS\0\0",
+            MapLumpsIndex::LineDefs  => &b"LINEDEFS",
+            MapLumpsIndex::SideDefs => &b"SIDEDEFS",
+            MapLumpsIndex::Vertexes  => &b"VERTEXES",
+            MapLumpsIndex::Segs      => &b"SEGS\0\0\0\0",
+            MapLumpsIndex::SubSectors  => &b"SSECTORS",
+            MapLumpsIndex::Nodes     => &b"NODES\0\0\0",
+            MapLumpsIndex::Sectors   => &b"SECTORS\0",
+            MapLumpsIndex::Reject    => &b"REJECT\0\0",
+            MapLumpsIndex::Blockmap  => &b"BLOCKMAP",
+            MapLumpsIndex::MaxSize     => &b"--------",
         }
     }
 }
@@ -227,16 +227,16 @@ fn map_lump_indexs_get_id(directories: &wad::DirectoryList, map_lump_id: usize, 
 impl MapLumpIndexs {
     pub fn new(directories: &wad::DirectoryList, map_lump_id: usize) -> Self {
         MapLumpIndexs {
-            things: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::THINGS.as_name()),
-            linedefs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::LINEDEFS.as_name()),
-            sideddefs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SIDEDDEFS.as_name()),
-            vertexes: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::VERTEXES.as_name()),
-            segs: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SEGS.as_name()),
-            ssectors: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SSECTORS.as_name()),
-            nodes: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::NODES.as_name()),
-            sectors: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::SECTORS.as_name()),
-            reject: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::REJECT.as_name()),
-            blockmap: map_lump_indexs_get_id(&directories, map_lump_id, MAPLUMPSINDEX::BLOCKMAP.as_name()),
+            things: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Things.as_name()),
+            linedefs: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::LineDefs.as_name()),
+            sideddefs: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::SideDefs.as_name()),
+            vertexes: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Vertexes.as_name()),
+            segs: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Segs.as_name()),
+            ssectors: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::SubSectors.as_name()),
+            nodes: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Nodes.as_name()),
+            sectors: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Sectors.as_name()),
+            reject: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Reject.as_name()),
+            blockmap: map_lump_indexs_get_id(&directories, map_lump_id, MapLumpsIndex::Blockmap.as_name()),
         }
     }
 }
@@ -273,6 +273,10 @@ impl LineDef {
 
     pub fn end_vertex<'a>(&'a self, map: &Map<'a>) -> &'a Vertex {
         return &map.vertices[self.end_vertex_id as usize];
+    }
+
+    pub fn has_flag(&self, mask:LineDefFlags) -> bool {
+        (self.flag & mask.value()) != 0
     }
 }
 

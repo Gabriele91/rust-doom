@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 use std::{ops::Div, rc::Rc};
 use num_traits::{Float, NumCast};
-use crate::{ 
-    actors, doom::Doom, map::{LineDef, Map}, math::Vector2
-};
+use crate::actors;
+use crate::math::Vector2;
+use crate::doom::Doom;
+use crate::map::{LineDef, Map, LineDefFlags};
 
 
 pub struct CollisionSolver<'wad> {
@@ -30,7 +31,7 @@ impl <'wad> CollisionSolver<'wad> {
                 let position = actor.get_transform().position_as_int();
                 if let Some(list_lines) = map.get(position.x, position.y) {
                     for line in list_lines.iter() {
-                        if (line.flag & 0x0001) != 0 {
+                        if line.has_flag(LineDefFlags::Blocking) {
                             transformation.position = self.try_move(
                                 &old_transformation.position(), 
                                 &transformation.position(),
