@@ -13,6 +13,7 @@ const DOOM_BAM_SCALE : f64 = 360.0 / 4294967296.0; // 8.38190317e-8
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct Thing {
     pub position: Vector2<i16>,
     pub angle: u16,
@@ -25,6 +26,7 @@ pub struct Thing {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct LineDef {
     pub start_vertex_id: u16,
     pub end_vertex_id: u16,
@@ -40,6 +42,7 @@ pub struct LineDef {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct SideDef {
     pub offset: Vector2<i16>,
     pub upper_texture: [u8; 8],
@@ -55,6 +58,7 @@ pub type Vertex = Vector2<i16>;
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct SubSector {
     pub seg_count: u16,
     pub first_seg_id: u16,
@@ -64,6 +68,7 @@ pub struct SubSector {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct Seg {
     pub start_vertex_id: u16, 
     pub end_vertex_id: u16, 
@@ -80,6 +85,7 @@ pub type NodeBox = Vector4<i16>;
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct Node {
     pub partition: Vector2<i16>,
     pub change_partition: Vector2<i16>,
@@ -93,6 +99,7 @@ pub struct Node {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct Sector {
     pub floor_height: i16,
     pub ceiling_height: i16,
@@ -107,6 +114,7 @@ pub struct Sector {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct BlockmapsHeader {
     pub x: i16,
     pub y: i16,

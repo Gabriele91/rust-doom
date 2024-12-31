@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+use std::alloc::{alloc, dealloc, Layout};
 use std::iter::StepBy;
 use std::path::Path;
 use std::mem;
@@ -8,8 +9,7 @@ use std::option::Option;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-
-#[repr(packed)]
+#[repr(C, packed(4))]
 #[derive(Debug)]
 pub struct Header {
     pub wad_type : [u8; 4],
@@ -153,23 +153,21 @@ pub struct Reader {
 }
 
 impl  Reader {
-
     pub fn new(wadfile: &String) -> Option<Self> {
-        if let Ok(file_buffer) = fs::read(&wadfile) {
-            return {
-                let reader = Reader {
-                    pathfile: wadfile.clone(),
-                    buffer: file_buffer,
-                };
-                if let Some(header) = reader.header() {
-                    if header.valid() {
-                        return Some(reader);
-                    }
-                }
-                None
+        // Read the file into an aligned buffer
+        fs::read(wadfile).ok().and_then(|file_content| {
+            // Create reader instance
+            let reader = Reader {
+                pathfile: wadfile.clone(),
+                buffer: file_content,
             };
-        }
-        None
+            if let Some(header) = reader.header() {
+                if header.valid() {
+                    return Some(reader);
+                }
+            }
+            None
+        })
     } 
 
     pub fn header(&self) -> Option<&Header> {
