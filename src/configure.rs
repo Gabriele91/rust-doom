@@ -182,8 +182,7 @@ impl Map {
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Map { 
             name: String::from(props.get("name")?),
-            blockmap_no_first_line: props.get("blockmap_no_first_line")
-                                   .and_then(|v| v.parse().ok())
+            blockmap_no_first_line: bool_from_str(props.get("blockmap_no_first_line"))
                                    .unwrap_or(Self::DEFAULT_BLOCKMAP_NO_FIRST_LINE),
         })
     }
