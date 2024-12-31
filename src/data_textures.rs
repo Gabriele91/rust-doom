@@ -224,7 +224,8 @@ impl TextureHeader {
                     panic!("Base pointer is null");
                 }
                 // Get number of textures
-                let number_of_textures = *(base_ptr as *const u32) as usize;
+                let number_of_textures_ptr: *const u32 = base_ptr as *const u32;
+                let number_of_textures: usize = std::ptr::read_unaligned(number_of_textures_ptr) as usize;
         
                 // Point to array
                 let array_offsets_ptr = base_ptr.add(mem::size_of::<u32>()) as *const u32;
@@ -622,7 +623,8 @@ impl<'a> DataTextures<'a> {
             let buffer: &Vec<u8> = &self.reader.buffer;
             let lump_offset = directory.start();
             // Get textures header
-            let header_textures = TextureHeader::new(&buffer[lump_offset..]);
+            let buffer_slide: &[u8] = &buffer[lump_offset..];
+            let header_textures = TextureHeader::new(&buffer_slide);
             // Test
             assert!(header_textures.size_of() <= directory.size());
             // For each texture read texture map
