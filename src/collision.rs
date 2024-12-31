@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use std::{ops::Div, rc::Rc};
 use num_traits::{Float, NumCast};
-use crate::actors;
 use crate::math::Vector2;
 use crate::doom::Doom;
 use crate::map::{LineDef, Map, LineDefFlags};
