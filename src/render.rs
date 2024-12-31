@@ -662,6 +662,11 @@ pub mod render_3d {
             // Seg reference
             let seg = seg_ex.seg;
 
+            // Get line def
+            if seg.line_defs(&self.map).has_flag(LineDefFlags::DontDraw) {
+                return None;
+            }
+
             // Right is mandatory
             let right_sector = seg.right_sector(&self.map)?;
             
