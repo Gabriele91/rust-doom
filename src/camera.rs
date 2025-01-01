@@ -66,7 +66,7 @@ impl Camera {
             Vector2::new(bbox.right(), bbox.bottom()),
         );
 
-        let position = actor.position();
+        let position = actor.get_transform().position_as_int();
         let mut bbox_sides = vec![];
         if position.x < bbox.left() {
             if position.y > bbox.top() {
@@ -99,8 +99,8 @@ impl Camera {
         }
 
         for (v1, v2) in bbox_sides {
-            let delta1 = Vector2::<f32>::from(&(v1 - *position));
-            let delta2 = Vector2::<f32>::from(&(v2 - *position));
+            let delta1 = Vector2::<f32>::from(&(v1 - position));
+            let delta2 = Vector2::<f32>::from(&(v2 - position));
             let angle1 = degrees(delta1.y.atan2(delta1.x));
             let angle2 = degrees(delta2.y.atan2(delta2.x));
 
@@ -164,8 +164,8 @@ impl Camera {
     ) -> Option<(u32, u32, f32)> {
         let fv1 = Vector2::<f32>::from(&vertex1);
         let fv2 = Vector2::<f32>::from(&vertex2);
-        let fpos = actor.float_position();
-        let fangle = actor.float_angle();
+        let fpos = actor.position();
+        let fangle = actor.angle();
         let mut segment_angle1 = degrees(angle(&fpos, &fv1));
         let mut segment_angle2 = degrees(angle(&fpos, &fv2));
         // Save wall angle

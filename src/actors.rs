@@ -3,75 +3,125 @@
 use crate::math::{Vector2, normalize_degrees, radians};
 use crate::map::Thing;
 use crate::doom::Doom;
-use crate::configure::Configure;
-
+use crate::configure;
+use crate::types::ThingType;
+use crate::collision::CollisionClass;
 // Utils
 use std::boxed::Box;
 use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
+#[derive(Debug, Clone)]
+pub struct Transform {
+    pub position: Vector2<f32>,
+    pub angle: f32,
+    pub height: i16
+}
+
+impl Transform {
+    pub fn new() -> Self {
+        Transform {
+            position: Vector2::new(0.0,0.0),
+            angle: 0.0,
+            height: 0
+        } 
+    }
+
+    pub fn set(position: Vector2<f32>, angle: f32, height: i16) -> Self {
+        Transform {
+            position: position,
+            angle: angle,
+            height: height
+        }
+    }
+
+    pub fn position(&self) -> Vector2<f32> {
+        self.position
+    }
+
+    pub fn angle(&self) -> f32 {
+        self.angle
+    }
+
+    pub fn height(&self) -> i16 {
+        self.height
+    }
+
+    pub fn position_as_int(&self) -> Vector2<i16> {
+        Vector2::<i16>::from(&self.position.round())
+    }
+
+    pub fn angle_as_int(&self) -> i16 {
+        self.angle.round() as i16
+    }
+
+    pub fn height_as_int(&self) -> i16 {
+        self.height
+    }
+
+}
+
 pub trait Actor {
-    fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64);
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64);
+    fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64); 
+
     fn type_id(&self) -> u16;
-    fn position(&self) -> &Vector2<i16>;
-    fn height(&self) -> &i16;
-    fn angle(&self) -> u16;
+    fn thing_type(&self) -> ThingType;
+    fn collision_class(&self) -> CollisionClass;
     fn flags(&self) -> u16;
-    // Best precision
-    fn float_position(&self) -> &Vector2<f32>;
-    fn float_angle(&self) -> f32;
+    fn size(&self) -> u16;
+
+    // Transform alias
+    fn position(&self) -> &Vector2<f32>;
+    fn angle(&self) -> f32;
+    fn height(&self) -> i16;
+
+    // Transform
+    fn get_last_transform(&self) -> &Transform;
+    fn get_transform(&self) -> &Transform;
+    fn set_transform(&mut self, transform: &Transform);
 }
 
 pub struct Player {
     type_id: u16,
-    position: Vector2<i16>,
-    height: i16,
-    angle: u16,
+    thing_type: ThingType,
+    collision_class: CollisionClass,
     flags: u16,
-    // local
-    internal_position: Vector2<f32>,
-    internal_angle: f32,
-    internal_height: i16,
+    // Transformation
+    transform: Transform,
+    last_transform: Transform,
+    configure: configure::Player,
     // Control
     control_direction: Vector2<f32>, 
     control_angle: f32,
     control_angle_update: f32,
-    // Settings
-    speed: f32,
-    angle_speed: f32,
-    player_height: i16,
-    // Jump
-    player_jump_max: i16,
-    player_jump_speed: i16,
     player_jump: i16,
     player_jump_lock: bool,
 }
 
 impl Player {
-    pub fn new<'wad>(thing: &'wad Thing, configure: &Configure) -> Box<dyn Actor> {
-        let position = thing.position;
-        let angle = thing.angle;
+    pub fn new<'wad>(thing: &'wad Thing, configure: &configure::Configure) -> Box<dyn Actor> {
+        let transform = {
+            Transform::set({
+                let position_i16 = thing.position;
+                Vector2::<f32>::from(&position_i16)
+            },  
+            thing.angle as f32, 
+            configure.player.height)
+        };
+        let thing_type =  ThingType::try_from(thing.type_id).unwrap_or(ThingType::Unknown);
         Box::new(Player {
             type_id: thing.type_id,
-            position: position,
-            height: 0,
-            angle: angle,
+            thing_type: thing_type,
+            collision_class: CollisionClass::new(thing_type),
             flags: thing.flags,
-            // local            
-            internal_position: Vector2::<f32>::from(&position),
-            internal_angle: thing.angle as f32,
-            internal_height:0,
+            last_transform: transform.clone(),
+            transform: transform.clone(),
+            configure: configure.player.clone(),
             // Control
             control_direction: Vector2::zeros(),
             control_angle: 0.0,
             control_angle_update: 0.0,
-            // Configure
-            speed: configure.player.speed,
-            angle_speed: configure.player.angle_speed,
-            player_height: configure.player.height,
-            player_jump_max: configure.player.jump,
-            player_jump_speed: configure.player.jump_speed,
             player_jump: 0,
             player_jump_lock: false
         })
@@ -81,38 +131,39 @@ impl Player {
 #[allow(unused_variables)]
 impl Actor for Player {
     fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        self.last_transform = self.transform.clone();
         // Angle
         if self.control_angle != 0.0 {
             self.control_angle /= self.control_angle_update;
-            self.internal_angle = normalize_degrees(self.internal_angle + (self.control_angle * self.angle_speed));
+            self.transform.angle = normalize_degrees(self.transform.angle + (self.control_angle * self.configure.angle_speed));
             self.control_angle = 0.0;
             self.control_angle_update = 0.0;
         }
-        self.angle = self.internal_angle.round() as u16;
         // Get move direction
         if self.control_direction.x != 0.0 || self.control_direction.y != 0.0 {
             let direction = self.control_direction.normalize();
             self.control_direction = Vector2::zeros();
             // Move rotation
-            let psin = radians(self.internal_angle - 90.0).sin();
-            let pcos = radians(self.internal_angle - 90.0).cos();
-            // New position
-            self.internal_position += Vector2::new(
+            let psin = radians(self.transform.angle - 90.0).sin();
+            let pcos = radians(self.transform.angle - 90.0).cos();
+            // Delta
+            let velocity = Vector2::new(
                 direction.x * pcos - direction.y * psin,
                 direction.x * psin + direction.y * pcos,
-            ) * self.speed;
+            ) * self.configure.speed;
+            // New position
+            self.transform.position += velocity;
         }
-        self.position = Vector2::<i16>::from(&self.internal_position.round());
         // Height
         if self.player_jump_lock {
-            self.player_jump -= self.player_jump_speed;
+            self.player_jump -= self.configure.jump_speed;
             if self.player_jump <= 0 {
                 self.player_jump_lock = false;
                 self.player_jump = 0;
             }
         }
-        self.internal_height = engine.bsp.floor_height(self.position());
-        self.height = self.internal_height + self.player_height + self.player_jump;    
+        self.transform.height = engine.bsp.floor_height(&self.transform.position_as_int()) + self.configure.height + self.player_jump;
+
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
@@ -143,9 +194,9 @@ impl Actor for Player {
             self.control_angle_update += 1.0;
         }
         if input.key_held(KeyCode::KeyE) 
-        && self.player_jump < self.player_jump_max 
+        && self.player_jump < self.configure.jump
         && !self.player_jump_lock {
-            self.player_jump += self.player_jump_speed;
+            self.player_jump += self.configure.jump_speed;
         } else if self.player_jump != 0 {
             self.player_jump_lock = true;
         }
@@ -154,29 +205,44 @@ impl Actor for Player {
     fn type_id(&self) -> u16 {
         self.type_id
     }
-    
-    fn position(&self) -> &Vector2<i16>{
-        &self.position
+
+    fn thing_type(&self) -> ThingType {
+        self.thing_type
     }
 
-    fn height(&self) -> &i16 {
-        &self.height
-    }
-
-    fn angle(&self) -> u16 {
-        self.angle as u16
+    fn collision_class(&self) -> CollisionClass {
+        self.collision_class
     }
 
     fn flags(&self) -> u16 {
         self.flags
     }    
 
-    fn float_position(&self) -> &Vector2<f32> {
-        &self.internal_position
+    fn size(&self) -> u16 {
+        self.configure.size
+    }    
+
+    fn position(&self) -> &Vector2<f32> {
+        &self.transform.position
     }
 
-    fn float_angle(&self) -> f32 {
-        self.internal_angle
+    fn angle(&self) -> f32 {
+        self.transform.angle()
     }
 
+    fn height(&self) -> i16 {
+        self.transform.height()
+    }
+
+    fn get_transform(&self) -> &Transform {
+        &self.transform
+    }
+
+    fn get_last_transform(&self) -> &Transform {
+        &self.last_transform
+    }
+
+    fn set_transform(&mut self, transform: &Transform) {
+        self.transform = transform.clone();
+    }
 }

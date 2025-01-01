@@ -126,7 +126,7 @@ pub mod render_2d {
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
                     let player_position = utils::remap_vertex(
-                        &actor.borrow().position(), 
+                        &actor.borrow().get_transform().position_as_int(), 
                         &self.bounds, 
                         &self.offset, 
                         &self.size
@@ -200,7 +200,7 @@ pub mod render_2d {
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
-                    bsp.visit_debug(&actor.borrow().position(), 
+                    bsp.visit_debug(&actor.borrow().get_transform().position_as_int(),
                     |subsector_id|{
                         let subsector = doom.map.sub_sectors[subsector_id as usize];
                         for sector_id in subsector.iter() {
@@ -274,7 +274,7 @@ pub mod render_2d {
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
                     bsp.visit(
-                     &actor.borrow().position(),
+                     &actor.borrow().get_transform().position_as_int(),
                      render, 
                      |subsector_id, render| -> bool {
                         let subsector = render.map.sub_sectors[subsector_id as usize];
@@ -360,7 +360,7 @@ pub mod render_2d {
             match doom.actors.iter().find(|&actor| actor.borrow().type_id() == 1) {
                 Some(actor) => {
                     if let Some(map) = &doom.map.blockmaps {
-                        let position= actor.borrow().position().clone();
+                        let position= actor.borrow().get_transform().position_as_int();
                         if let Some(list_lines) = map.get(position.x, position.y) {
                             for line in list_lines.iter() {
                                 let vertex1 = line.start_vertex(&doom.map);
@@ -451,7 +451,7 @@ pub mod render_3d {
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
-    use crate::map::{Map, Seg, SideDef, LINEDEF_FLAGS};
+    use crate::map::{Map, Seg, SideDef, LineDefFlags};
     use crate::math::{Vector2, radians};
     use crate::shape::Size;
     use crate::window::DoomSurface;
@@ -784,9 +784,9 @@ pub mod render_3d {
                     let line = seg.line_defs(&self.map);
                     let side = line.front_side(&self.map).unwrap();
                     let sector = seg.front_sector(&self.map).unwrap();
-                    let angle = actor.float_angle();
-                    let position = actor.float_position();
-                    let height = *actor.height();
+                    let angle = actor.angle();
+                    let position = actor.position();
+                    let height = actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
@@ -840,7 +840,7 @@ pub mod render_3d {
                     // Texture height
                     let middle_texture_alt = {
                         if let Some(ref texture) = wall_texture {
-                            if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                            if line.has_flag(LineDefFlags::DontPegBottom) { 
                                 wall_floor + texture.size.y as i16 + side.offset.y  
                             } else {
                                 wall_ceiling + side.offset.y  
@@ -955,9 +955,9 @@ pub mod render_3d {
                     let side = line.front_side(&self.map).unwrap();
                     let front_sector = seg.front_sector(&self.map).unwrap();
                     let back_sector = seg.back_sector(&self.map).unwrap();
-                    let angle = actor.float_angle();
-                    let position = actor.float_position();
-                    let height = *actor.height();
+                    let angle = actor.angle();
+                    let position = actor.position();
+                    let height = actor.height();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Get texture
@@ -1048,7 +1048,7 @@ pub mod render_3d {
                                 wall_center_angle: wall_normal_angle - angle,
                                 upper_texture_alt: {
                                     if b_draw_upper_wall {
-                                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_TOP.value()) != 0 { 
+                                        if line.has_flag(LineDefFlags::DontPegTop) { 
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_ceiling + upper_texture.clone().unwrap().size.y as i16 + side.offset.y
@@ -1059,7 +1059,7 @@ pub mod render_3d {
                                 },
                                 lower_texture_alt: {
                                     if b_draw_lower_wall {
-                                        if (line.flag & LINEDEF_FLAGS::DONT_PEG_BOTTOM.value()) != 0 { 
+                                        if line.has_flag(LineDefFlags::DontPegBottom) {
                                             front_wall_ceiling + side.offset.y
                                         } else {
                                             back_wall_floor + side.offset.y  
@@ -1329,7 +1329,7 @@ pub mod render_3d {
             match doom.actors.iter().find(|&actor| actor.as_ref().borrow().type_id() == 1) {
                 Some(actor) => {
                     bsp.visit(
-                        &actor.as_ref().borrow().position(), 
+                        &actor.as_ref().borrow().get_transform().position_as_int(), 
                         render,
                         |subsector_id, render|{
                         let subsector = render.map.sub_sectors[subsector_id as usize];

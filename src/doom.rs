@@ -2,6 +2,7 @@
 use crate::actors::Actor;
 use crate::bsp::BSP;
 use crate::configure::Configure;
+use crate::collision::CollisionSolver;
 use crate::render::{
     render_2d::{RenderBSP, RenderCamera, RenderMap, RenderCollision, RenderTextures},
     render_3d::RenderSoftware,
@@ -33,6 +34,7 @@ pub struct Doom<'wad> {
 
     pub surface: Rc<RefCell<DoomSurface>>,
     pub renders: Vec<Rc<RefCell<Box<dyn Render + 'wad>>>>,
+    pub collider: Rc<RefCell<CollisionSolver<'wad>>>
 }
 
 macro_rules! crea_render {
@@ -118,13 +120,6 @@ impl<'wad> Doom<'wad> {
                             bsp_2d.xy()
                         )));
                     }
-                    if let Some(collision_2d) = &render.collision_2d {
-                        renders.push(crea_render!(RenderCollision::new(
-                            &map,
-                            collision_2d.zw(),
-                            collision_2d.xy(),
-                        )));
-                    }
                     if let Some(camera_2d) = &render.camera_2d {
                         renders.push(crea_render!(RenderCamera::new(
                             &map,
@@ -133,16 +128,27 @@ impl<'wad> Doom<'wad> {
                             &configure.camera
                         )));
                     }
+                    if let Some(collision_2d) = &render.collision_2d {
+                        renders.push(crea_render!(RenderCollision::new(
+                            &map,
+                            collision_2d.zw(),
+                            collision_2d.xy(),
+                        )));
+                    }
                 }
                 renders
             },
+            collider: Rc::new(RefCell::new(CollisionSolver::new(&map)))
         })
     }
 
     pub fn update(&mut self, last_frame_time: f64, blending_factor: f64) {
+        // Update actors
         for actor in &self.actors {
             actor.borrow_mut().update(self, last_frame_time, blending_factor);
         }
+        // Update collisions
+        self.collider.clone().borrow_mut().update(self, last_frame_time, blending_factor);
     }
 
     pub fn draw(&mut self, last_frame_time: f64, blending_factor: f64) {

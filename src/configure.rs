@@ -3,10 +3,14 @@
 use ini::{Ini, Properties};
 use crate::math::{Vector2, Vector4};
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Resource {
     pub wad : String
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Screen {
     pub title: String,
     pub window: Vector2<f64>, 
@@ -15,23 +19,34 @@ pub struct Screen {
     pub vsync: bool
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Camera {
     pub fov: f32,
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Player {
+    pub size: u16,
+    pub height: i16,
+    // Movement
     pub speed: f32,
     pub angle_speed: f32,
-    pub height: i16,
+    // jump
     pub jump: i16,
     pub jump_speed: i16
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Map {
     pub name: String,
     pub blockmap_no_first_line: bool
 }
 
+#[readonly::make]
+#[derive(Clone)]
 pub struct Render {
     pub map_2d: Option<Vector4<i32>>, 
     pub bsp_2d: Option<Vector4<i32>>,
@@ -44,6 +59,7 @@ pub struct Render {
 }
 
 #[readonly::make]
+#[derive(Clone)]
 pub struct Configure {
     pub resource: Resource,
     pub screen: Screen,
@@ -128,22 +144,46 @@ impl Camera {
 }
 
 impl Player {
+    // Default constants
+    const DEFAULT_SIZE: u16 = 16;
+    const DEFAULT_HEIGHT: i16 = 56;
+    const DEFAULT_SPEED: f32 = 1.0;
+    const DEFAULT_ANGLE_SPEED: f32 = 0.5;
+    const DEFAULT_JUMP: i16 = 10;
+    const DEFAULT_JUMP_SPEED: i16 = 2;
+
     pub fn from(props: &Properties) -> Option<Self> {
-        Some(Player { 
-            speed: props.get("speed")?.parse().ok()?,
-            angle_speed: props.get("angle_speed")?.parse().ok()?,
-            height: props.get("height")?.parse().ok()?,
-            jump: props.get("jump")?.parse().ok()?,
-            jump_speed: props.get("jump_speed")?.parse().ok()?,
+        Some(Player {
+            size: props.get("size")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_SIZE),
+            height: props.get("height")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_HEIGHT),
+            speed: props.get("speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_SPEED),
+            angle_speed: props.get("angle_speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_ANGLE_SPEED),
+            jump: props.get("jump")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_JUMP),
+            jump_speed: props.get("jump_speed")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::DEFAULT_JUMP_SPEED),
         })
     }
 }
 
 impl Map {
+    const DEFAULT_BLOCKMAP_NO_FIRST_LINE: bool = false;
+
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Map { 
             name: String::from(props.get("name")?),
-            blockmap_no_first_line: bool_from_str(props.get("blockmap_no_first_line")).unwrap_or(false),
+            blockmap_no_first_line: bool_from_str(props.get("blockmap_no_first_line"))
+                                   .unwrap_or(Self::DEFAULT_BLOCKMAP_NO_FIRST_LINE),
         })
     }
 }

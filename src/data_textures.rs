@@ -13,29 +13,29 @@ use std::{
 use crate::wad;
 use crate::math::Vector2;
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct Palette([[u8; 3]; 256]);
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct PNames {
     number_of_names: u32,
     names: [[u8; 8]; 0]
 }
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct RawFlats([u8; 64 * 64]);
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct PatchHeader {
     pub size: [u16;2],
     pub offset: [u16;2],
@@ -44,22 +44,23 @@ pub struct PatchHeader {
 #[allow(dead_code)]
 #[derive(Debug)]
 #[readonly::make]
+#[repr(C)]
 pub struct PatchContent<'a>(&'a [u32]);
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct PatchColumnHeaderData {
     pub y_offset: u8, 
     pub length: u8, 
     _padding_: u8, 
 }
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct PatchColumnData<'a> {
     pub header: &'a PatchColumnHeaderData,
     pub data: Option<&'a [u8]>
@@ -79,10 +80,10 @@ pub struct Patch<'a> {
     pub columns: Vec<PatchColumn<'a>>
 }
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct PatchMap {
     pub origin: [i16; 2],
     pub patch_id: u16, // Id of the patch in the PNAME
@@ -90,9 +91,9 @@ pub struct PatchMap {
     pub color_map: u16 // Pallete to be used
 }
 
-#[repr(packed)]
 #[allow(dead_code)]
 #[readonly::make]
+#[repr(C, packed(4))]
 pub struct TextureMap {
     pub name: [u8; 8],
     pub flags: u32, // C Boolean, aka a int
@@ -102,13 +103,7 @@ pub struct TextureMap {
     pub patch_maps: [PatchMap; 0]
 }
 
-#[repr(packed)]
-#[allow(dead_code)]
-#[readonly::make]
-pub struct TextureHeader {
-    pub number_of_textures: u32,
-    pub offsets: [u32; 0],
-}
+pub struct TextureHeader (Vec<u32>);
 
 pub struct Texture<const C : usize> {
     pub size: Vector2<u16>,
@@ -220,22 +215,46 @@ impl<'a> PatchContent<'a> {
 
 // Texture map
 impl TextureHeader {
-    pub fn size_of(&self) -> usize {
-        size_of::<TextureHeader>() + (self.number_of_textures as usize) * size_of::<usize>()
-    }
+
+    pub fn new<'a>(buffer: &'a [u8]) -> Self {
+        TextureHeader{
+            0 : unsafe {
+                let base_ptr: *const u8 =  buffer.as_ptr();
+                if base_ptr.is_null() {
+                    panic!("Base pointer is null");
+                }
+                // Get number of textures
+                let number_of_textures_ptr: *const u32 = base_ptr as *const u32;
+                let number_of_textures: usize = std::ptr::read_unaligned(number_of_textures_ptr) as usize;
+        
+                // Point to array
+                let array_offsets_ptr = base_ptr.add(mem::size_of::<u32>()) as *const u32;
+                if array_offsets_ptr.is_null() {
+                    panic!("Offsets pointer is null");
+                }
+
+                // Create new Vec and copy data
+                let mut vec = Vec::with_capacity(number_of_textures);
+                
+                // Copy elements one by one to handle misalignment
+                for i in 0..number_of_textures {
+                    let value = std::ptr::read_unaligned(array_offsets_ptr.add(i));
+                    vec.push(value);
+                }
     
-    pub fn iter<'a>(&'a self) -> std::slice::Iter<'_,u32> {
-        let number_of_textures = self.number_of_textures;
-        unsafe {
-            // Convert this struct into a array buffer
-            let offsets_ptr: *const u32 = mem::transmute(self);
-            // Convert and jump first element (number_of_textures)
-            std::slice::from_raw_parts(
-                offsets_ptr, 
-                (number_of_textures + 1) as usize
-            )[1..].iter()
+                vec
+            }
         }
     }
+
+    pub fn size_of(&self) -> usize {
+        mem::size_of::<u32>() + (self.0.len() as usize) * size_of::<usize>()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_,u32> {
+        self.0.iter()
+    }
+
 }
 
 impl TextureMap {
@@ -603,10 +622,13 @@ impl<'a> DataTextures<'a> {
             // Ref to buffer
             let buffer: &Vec<u8> = &self.reader.buffer;
             let lump_offset = directory.start();
-            // Get all textures
-            let header_texture_pack: &'a TextureHeader = unsafe { mem::transmute(&buffer[lump_offset]) };
+            // Get textures header
+            let buffer_slide: &[u8] = &buffer[lump_offset..];
+            let header_textures = TextureHeader::new(&buffer_slide);
+            // Test
+            assert!(header_textures.size_of() <= directory.size());
             // For each texture read texture map
-            for texture_map_offset in header_texture_pack.iter() {
+            for texture_map_offset in header_textures.iter() {
                 let texture_map : &'a TextureMap = unsafe { mem::transmute(&buffer[lump_offset + *texture_map_offset as usize]) };
                 vec_t.push(texture_map);
             }
@@ -645,7 +667,8 @@ impl<'a> DataTextures<'a> {
                                                 break;
                                             }
                                             let palette_id = *pidx as usize;
-                                            let texture_idx = (texture_data_y * texture_width + texture_data_x) as usize;
+                                            let texture_data_span = texture_data_y as usize * texture_width as usize;
+                                            let texture_idx = texture_data_span + texture_data_x as usize;
                                             texture_data[texture_idx][0..3].copy_from_slice(&(*palette)[palette_id]);
                                             texture_data[texture_idx][3] = 0xFF;
                                             texture_data_y += 1;
