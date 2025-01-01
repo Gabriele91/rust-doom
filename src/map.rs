@@ -473,6 +473,44 @@ impl<'a> Blockmaps<'a> {
         }
     }
 
+    pub fn get_with_radius(&self, x: i16, y: i16, radius: u16) -> Vec<Rc<Vec<&'a LineDef>>> {
+        // Calcola l'offset relativo all'origine della blockmap
+        let m_x = (x as i32 - self.header.x as i32) / Blockmaps::BLOCKSIZE;
+        let m_y = (y as i32 - self.header.y as i32) / Blockmaps::BLOCKSIZE;
+    
+        // Calcola il raggio in termini di blocchi
+        let block_radius = (radius as i32 + Blockmaps::BLOCKSIZE - 1) / Blockmaps::BLOCKSIZE;
+    
+        // Risultato accumulato
+        let mut result = Vec::new();
+    
+        // Itera sui blocchi nel raggio
+        for dy in -block_radius..=block_radius {
+            for dx in -block_radius..=block_radius {
+                let bx = m_x + dx;
+                let by = m_y + dy;
+    
+                // Controlla che il blocco sia dentro i confini della blockmap
+                if bx >= 0 && bx < (self.header.columns as i32) 
+                    && by >= 0 && by < (self.header.rows as i32) 
+                {
+                    let i_x = bx as usize; // Converti in indice
+                    let i_y = by as usize;
+    
+                    let columns = self.header.columns as usize;
+                    let block_index = columns * i_y + i_x;
+    
+                    // Aggiungi le linee del blocco al risultato
+                    if let Some(lines) = self.metrix_lines.get(block_index) {
+                        result.push(lines.clone());
+                    }
+                }
+            }
+        }
+    
+        result
+    }
+    
 }
 
 impl<'a> Map<'a> {

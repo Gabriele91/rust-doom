@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use std::fmt::Display;
 use std::{ops::Div, rc::Rc};
 use num_traits::{Float, NumCast};
 use crate::math::Vector2;
@@ -28,7 +29,7 @@ impl <'wad> CollisionSolver<'wad> {
             // Collision
             if let Some(ref map) = engine.map.blockmaps {
                 let position = actor.get_transform().position_as_int();
-                if let Some(list_lines) = map.get(position.x, position.y) {
+                for list_lines in map.get_with_radius(position.x, position.y, actor.size()) {
                     for line in list_lines.iter() {
                         if line.has_flag(LineDefFlags::Blocking) {
                             transformation.position = self.try_move(
@@ -46,7 +47,7 @@ impl <'wad> CollisionSolver<'wad> {
     }
 
     
-    pub fn try_move<'a, T: Float + Sized + Copy + NumCast + Default + Div>(
+    pub fn try_move<'a, T: Float + Sized + Copy + NumCast + Default + Div + Display>(
         &self,
         position: &Vector2<T>,
         newposition: &Vector2<T>,
@@ -54,15 +55,47 @@ impl <'wad> CollisionSolver<'wad> {
         map: &Map<'a>,
         line: &LineDef,
     ) -> Vector2<T> {
+        let velocity = *newposition - *position;
+        let velocity_length = velocity.magnitude();
         // Get line segment points (note: fixed order from end to start)
-        let start = Vector2::<T>::from(&line.start_vertex(&map));
-        let end = Vector2::<T>::from(&line.end_vertex(&map));
+        let wall_start = Vector2::<T>::from(&line.start_vertex(&map));
+        let wall_end = Vector2::<T>::from(&line.end_vertex(&map));
         
+        // If velocity is small enough, use single check
+        if velocity_length <= radius {
+            return self.single_collision_check(position, newposition, radius, &wall_start, &wall_end);
+        }
+        
+        // Multiple checks for high velocity
+        let steps = (velocity_length / radius).ceil();
+        let inv_steps = T::one() / steps;
+        let step_velocity = velocity * inv_steps;
+        
+        let mut current_pos = *position;
+        let mut next_pos;
+        
+        // Perform multiple smaller steps
+        for _ in 0..steps.to_u32().unwrap() {
+            next_pos = current_pos + step_velocity;
+            current_pos = self.single_collision_check(&current_pos, &next_pos, radius, &wall_start, &wall_end);
+        }
+        
+        return current_pos;
+    }
+    
+    fn single_collision_check<'a, T: Float + Sized + Copy + NumCast + Default + Div + Display>(
+        &self,
+        position: &Vector2<T>,
+        newposition: &Vector2<T>,
+        radius: T,
+        wall_start: &Vector2<T>,
+        wall_end: &Vector2<T>
+    ) -> Vector2<T> {
         // Calculate attempted movement vector
         let movement = *newposition - *position;
         
         // Calculate wall properties
-        let wall_vec = end - start;
+        let wall_vec = *wall_end - *wall_start;
         let wall_length = wall_vec.magnitude();
         
         // Handle degenerate walls
@@ -74,13 +107,13 @@ impl <'wad> CollisionSolver<'wad> {
         let wall_normal = Vector2::new(wall_dir.y, -wall_dir.x);
     
         // Vector from wall start to current position
-        let to_wall = *position - start;
+        let to_wall = *position - *wall_start;
         
         // Distance to wall along its normal
         let perp_dist = to_wall.dot(&wall_normal);
         
         // Early out if we're too far from wall
-        let collision_margin = radius + T::from(1.0).unwrap();
+        let collision_margin = radius + T::one();
         if perp_dist.abs() > collision_margin {
             return *newposition;
         }
@@ -122,20 +155,6 @@ impl <'wad> CollisionSolver<'wad> {
         // Project movement onto wall direction for sliding
         let parallel_movement = wall_dir * movement.dot(&wall_dir);
         *position + parallel_movement
-    }
-    
-    // Helper function to check if a point is on the backside of a line
-    fn is_backside<T: Float>(
-        point: &Vector2<T>,
-        line_start: &Vector2<T>,
-        line_end: &Vector2<T>
-    ) -> bool {
-        let dx = line_end.x - line_start.x;
-        let dy = line_end.y - line_start.y;
-        let px = point.x - line_start.x;
-        let py = point.y - line_start.y;
-        
-        (px * dy - py * dx) > T::zero()
     }
 
 }
