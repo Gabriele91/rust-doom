@@ -4,6 +4,8 @@ use crate::math::{Vector2, normalize_degrees, radians};
 use crate::map::Thing;
 use crate::doom::Doom;
 use crate::configure;
+use crate::types::ThingType;
+use crate::collision::CollisionClass;
 // Utils
 use std::boxed::Box;
 use winit::keyboard::KeyCode;
@@ -64,6 +66,8 @@ pub trait Actor {
     fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64); 
 
     fn type_id(&self) -> u16;
+    fn thing_type(&self) -> ThingType;
+    fn collision_class(&self) -> CollisionClass;
     fn flags(&self) -> u16;
     fn size(&self) -> u16;
 
@@ -80,6 +84,8 @@ pub trait Actor {
 
 pub struct Player {
     type_id: u16,
+    thing_type: ThingType,
+    collision_class: CollisionClass,
     flags: u16,
     // Transformation
     transform: Transform,
@@ -103,8 +109,11 @@ impl Player {
             thing.angle as f32, 
             configure.player.height)
         };
+        let thing_type =  ThingType::try_from(thing.type_id).unwrap_or(ThingType::Unknown);
         Box::new(Player {
             type_id: thing.type_id,
+            thing_type: thing_type,
+            collision_class: CollisionClass::new(thing_type),
             flags: thing.flags,
             last_transform: transform.clone(),
             transform: transform.clone(),
@@ -195,6 +204,14 @@ impl Actor for Player {
 
     fn type_id(&self) -> u16 {
         self.type_id
+    }
+
+    fn thing_type(&self) -> ThingType {
+        self.thing_type
+    }
+
+    fn collision_class(&self) -> CollisionClass {
+        self.collision_class
     }
 
     fn flags(&self) -> u16 {

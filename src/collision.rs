@@ -5,12 +5,126 @@ use num_traits::{Float, NumCast};
 use crate::math::Vector2;
 use crate::doom::Doom;
 use crate::map::{LineDef, Map, LineDefFlags};
+use crate::types::ThingType;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u16)]
+pub enum CollisionClass {
+    Player,
+    Monster,
+    Static,
+    Projectile,
+    Pickup,
+}
+
+impl CollisionClass {
+    pub fn new(thing_type: ThingType) -> Self {
+        match thing_type {
+            // Players
+            ThingType::Player1Start 
+            | ThingType::Player2Start 
+            | ThingType::Player3Start 
+            | ThingType::Player4Start => CollisionClass::Player,
+
+            // Monsters
+            ThingType::ZombieMan
+            | ThingType::ShotgunGuy
+            | ThingType::HeavyWeaponDude
+            | ThingType::Imp
+            | ThingType::Demon
+            | ThingType::Spectre
+            | ThingType::LostSoul
+            | ThingType::Cacodemon
+            | ThingType::HellKnight
+            | ThingType::BaronOfHell
+            | ThingType::Arachnotron
+            | ThingType::PainElemental
+            | ThingType::Revenant
+            | ThingType::Mancubus
+            | ThingType::ArchVile
+            | ThingType::Cyberdemon
+            | ThingType::SpiderDemon => CollisionClass::Monster,
+
+            // Pickups
+            ThingType::Shotgun
+            | ThingType::SuperShotgun
+            | ThingType::Chaingun
+            | ThingType::RocketLauncher
+            | ThingType::PlasmaRifle
+            | ThingType::BFG9000
+            | ThingType::Shell4
+            | ThingType::BulletBox
+            | ThingType::RocketBox
+            | ThingType::ShellBox
+            | ThingType::Clip
+            | ThingType::EnergyCell
+            | ThingType::EnergyPack => CollisionClass::Pickup,
+
+            // Statics
+            ThingType::GreenArmor
+            | ThingType::BlueArmor
+            | ThingType::Stimpack
+            | ThingType::Medikit
+            | ThingType::Berserk
+            | ThingType::Soulsphere
+            | ThingType::Invulnerability
+            | ThingType::LightAmp
+            | ThingType::ComputerMap
+            | ThingType::RadSuit => CollisionClass::Static,
+
+            // Default case
+            _ => CollisionClass::Static,
+        }
+    }
+
+    pub fn can_collide_with(&self, other_class: &CollisionClass) -> bool {        
+        match (*self, *other_class) {
+            (CollisionClass::Player, CollisionClass::Monster) => true,
+            (CollisionClass::Player, CollisionClass::Static) => true,
+            (CollisionClass::Monster, CollisionClass::Static) => true,
+            (CollisionClass::Monster, CollisionClass::Monster) => true,
+            _ => false
+        }
+    }
+
+    pub fn is_shootable(&self) -> bool {
+        matches!(*self, CollisionClass::Monster | CollisionClass::Player)
+    }
+
+    pub fn blocks_movement(&self) -> bool {
+        matches!(*self, CollisionClass::Monster | CollisionClass::Static | CollisionClass::Player)
+    }
+}
+
+fn get_default_radius(thing_type:&ThingType) -> i32 {
+    match thing_type {
+        // Players
+        ThingType::Player1Start 
+        | ThingType::Player2Start 
+        | ThingType::Player3Start 
+        | ThingType::Player4Start => 16,
+
+        // Specific monsters
+        ThingType::ZombieMan 
+        | ThingType::ShotgunGuy 
+        | ThingType::HeavyWeaponDude => 20,
+
+        ThingType::Imp => 20,
+        ThingType::Demon 
+        | ThingType::Spectre => 30,
+
+        ThingType::Cacodemon => 31,
+        ThingType::LostSoul => 16,
+        ThingType::BaronOfHell => 24,
+
+        // Default case
+        _ => 20,
+    }
+}
 
 pub struct CollisionSolver<'wad> {
     map: Rc<Map<'wad>>,
 }
-
 
 impl <'wad> CollisionSolver<'wad> {
     pub fn new(map: &Rc<Map<'wad>>) -> Self {
@@ -27,20 +141,42 @@ impl <'wad> CollisionSolver<'wad> {
             let old_transformation = actor.get_last_transform();
             let mut transformation = actor.get_transform().clone();
             // Collision
-            if let Some(ref map) = engine.map.blockmaps {
-                let position = actor.get_transform().position_as_int();
-                for list_lines in map.get_with_radius(position.x, position.y, actor.size()) {
-                    for line in list_lines.iter() {
-                        if line.has_flag(LineDefFlags::Blocking) {
-                            transformation.position = self.try_move(
-                                &old_transformation.position(), 
-                                &transformation.position(),
-                                actor.size() as f32, 
-                                &engine.map, 
-                                &line);
+            match actor.collision_class() {
+                  CollisionClass::Player 
+                | CollisionClass::Monster 
+                | CollisionClass::Projectile => {
+                    if let Some(ref map) = engine.map.blockmaps {
+                        let position = actor.get_transform().position_as_int();
+                        for list_lines in map.get_with_radius(position.x, position.y, actor.size()) {
+                            for line in list_lines.iter() {
+                                match actor.collision_class() {
+                                    CollisionClass::Player => {
+                                        if line.has_flag(LineDefFlags::Blocking) {
+                                            transformation.position = self.try_move(
+                                                &old_transformation.position(), 
+                                                &transformation.position(),
+                                                actor.size() as f32, 
+                                                &engine.map, 
+                                                &line);
+                                        }
+                                    },
+                                    CollisionClass::Monster => {
+                                        if line.has_flag(LineDefFlags::Blocking) || line.has_flag(LineDefFlags::BlockMonsters) {
+                                            transformation.position = self.try_move(
+                                                &old_transformation.position(), 
+                                                &transformation.position(),
+                                                actor.size() as f32, 
+                                                &engine.map, 
+                                                &line);
+                                        }
+                                    },
+                                    _ => {}
+                                }
+                            }
                         }
                     }
-                }
+                },
+                _ => {}
             }
             actor.set_transform(&transformation);
         }

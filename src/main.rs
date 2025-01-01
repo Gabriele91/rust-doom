@@ -13,6 +13,7 @@ mod window;
 mod camera;
 mod data_textures;
 mod collision;
+mod types;
 // Using engine
 use configure::Configure;
 use doom::Doom;

@@ -120,19 +120,19 @@ impl<'wad> Doom<'wad> {
                             bsp_2d.xy()
                         )));
                     }
-                    if let Some(collision_2d) = &render.collision_2d {
-                        renders.push(crea_render!(RenderCollision::new(
-                            &map,
-                            collision_2d.zw(),
-                            collision_2d.xy(),
-                        )));
-                    }
                     if let Some(camera_2d) = &render.camera_2d {
                         renders.push(crea_render!(RenderCamera::new(
                             &map,
                             camera_2d.zw(),
                             camera_2d.xy(),
                             &configure.camera
+                        )));
+                    }
+                    if let Some(collision_2d) = &render.collision_2d {
+                        renders.push(crea_render!(RenderCollision::new(
+                            &map,
+                            collision_2d.zw(),
+                            collision_2d.xy(),
                         )));
                     }
                 }
