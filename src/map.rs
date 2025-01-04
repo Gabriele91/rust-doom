@@ -349,6 +349,15 @@ impl Seg {
         return &map.vertices[self.end_vertex_id as usize];
     }
 
+    pub fn side<'a>(&'a self, map: &Map<'a>) -> Option<&'a SideDef> {
+        let line_defs = self.line_defs(&map);
+        if self.direction == 0 {
+            line_defs.right_side(map)
+        } else {            
+            line_defs.left_side(map)
+        }
+    }
+
     pub fn float_degrees_angle(&self) -> f32 {
         // Conver to i32
         let mut angle_i32: i32 = self.angle as i32;

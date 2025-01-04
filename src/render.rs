@@ -466,6 +466,13 @@ pub mod render_3d {
     }
     
     #[derive(Clone)]
+    enum WallType {
+        NoWall,
+        SolidWall,
+        PortalWall
+    }
+    
+    #[derive(Clone)]
     struct SegExtraData<'wad> {
         seg:&'wad Seg,
         ceiling_texture_id: Option<usize>,
@@ -474,12 +481,9 @@ pub mod render_3d {
         lower_texture_id: Option<usize>,
         floor_texture_id: Option<usize>,
         sky_texture_id: Option<usize>,
-        light_level: f32
-    }
-
-    enum WallType<'wad> {
-        SolidWall(&'wad SegExtraData<'wad>),
-        PortalWall(&'wad SegExtraData<'wad>)
+        light_level: f32,
+        window: bool,
+        wall_type: WallType
     }
     
     // Render 3D bsp
@@ -529,56 +533,57 @@ pub mod render_3d {
         fn preprocessing(mut self) -> Self
         {
             for seg in &self.map.segs {
-                self.seg_extra_data.push(Box::new(SegExtraData {
+                let seg_extra_data = SegExtraData {
                     seg: &seg,
                     ceiling_texture_id: seg
-                                        .front_sector(&self.map)
-                                        .and_then(|sector| self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.ceiling_texture)),
+                                      .front_sector(&self.map)
+                                      .and_then(|sector| {
+                                        if sector.ceiling_texture != consts::VOID_TEXTURE {
+                                            self.data_textures.get_flat_id(&sector.ceiling_texture)
+                                        } else {
+                                            None
+                                        }
+                                      }),
                     upper_texture_id: {
-                        let line = seg.line_defs(&self.map);
                         let find_id_upper = |side: &SideDef| {
-                            if side.upper_texture != consts::VOID_TEXTURE {  
-                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.upper_texture)
+                            if side.upper_texture != consts::VOID_TEXTURE {
+                                self.data_textures.get_texture_id(&side.upper_texture)
                             } else {
                                 None
                             }
                         };
-                        line
-                        .front_side(&self.map)
+                        seg
+                        .side(&self.map)
                         .and_then(find_id_upper)
-                        .or( line.back_side(&self.map).and_then(find_id_upper))
                     },
                     wall_texture_id: {
-                        let line = seg.line_defs(&self.map);
-                        line
-                        .front_side(&self.map)
+                        seg
+                        .side(&self.map)
                         .and_then(|side| { 
-                            if side.middle_texture != consts::VOID_TEXTURE {  
-                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.middle_texture)  
+                            if side.middle_texture != consts::VOID_TEXTURE {
+                                self.data_textures.get_texture_id(&side.middle_texture)
                             } else {
                                 None
                             }
                         })
                     },
                     lower_texture_id: {
-                        let line = seg.line_defs(&self.map);
                         let find_id_lower = |side: &SideDef| {
                             if side.lower_texture != consts::VOID_TEXTURE {  
-                                self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == side.lower_texture)
+                                self.data_textures.get_texture_id(&side.lower_texture)
                             } else {
                                 None
                             }
                         };
-                        line
-                        .front_side(&self.map)
+                        seg
+                        .side(&self.map)
                         .and_then(find_id_lower)
-                        .or( line.back_side(&self.map).and_then(find_id_lower))
                     },
                     floor_texture_id: seg
                                       .front_sector(&self.map)
                                       .and_then(|sector| {
                                         if sector.floor_texture != consts::VOID_TEXTURE {
-                                            self.data_textures.flats_names.iter().position(|flats_name| *flats_name == sector.floor_texture)
+                                            self.data_textures.get_flat_id(&sector.floor_texture)
                                         } else {
                                             None
                                         }
@@ -588,7 +593,7 @@ pub mod render_3d {
                                     .and_then(|sector| {
                                         if sector.ceiling_texture != consts::VOID_TEXTURE && is_sky_texture(&sector.ceiling_texture) {
                                             let sky_name = &remap_sky_texture(&sector.ceiling_texture);
-                                            self.data_textures.texture_maps.iter().position(|tex_map| tex_map.name == *sky_name)
+                                            self.data_textures.get_texture_id(sky_name)
                                         } else {
                                             None
                                         }
@@ -597,7 +602,40 @@ pub mod render_3d {
                                   .front_sector(&self.map)
                                   .and_then(|sector| Some(math::clamp(sector.light_level as f32 / 255.0, 0.0, 1.0)))
                                   .unwrap_or(0.0 as f32),
-                }));
+                    window : {
+                        if let Some(side) = seg.side(&self.map) {
+                               seg.line_defs(&self.map).has_flag(LineDefFlags::TwoSided) 
+                            && side.middle_texture != consts::VOID_TEXTURE 
+                        } else {
+                            false
+                        }
+                    },
+                    wall_type : {
+                        // By default is a wall
+                        let mut wall_type = WallType::SolidWall;
+                        // Or it is a portal if cconnect 2 sectors
+                        if let (Some(front_sector), Some(back_sector)) = (seg.front_sector(&self.map), seg.back_sector(&self.map)) {
+                            // So it is a portal
+                            wall_type = WallType::PortalWall;
+                            // Special case: triggers: NoWall to draw
+                            if front_sector.floor_height == back_sector.floor_height 
+                            && front_sector.ceiling_height == back_sector.ceiling_height
+                            && front_sector.light_level == back_sector.light_level {
+                                if let Some(side) = seg.side(&self.map) {
+                                    if side.middle_texture == consts::VOID_TEXTURE
+                                    && side.upper_texture == consts::VOID_TEXTURE 
+                                    && side.lower_texture == consts::VOID_TEXTURE {
+                                        wall_type = WallType::NoWall;
+                                    }
+                                }
+                            }
+                        }
+                    
+                        wall_type
+                    }
+                    
+                };
+                self.seg_extra_data.push(Box::new(seg_extra_data));
             }
             // Returns itself
             self
@@ -654,42 +692,11 @@ pub mod render_3d {
             rgba
         }
         
-        fn classify_segment<'a>(&self, seg_ex: &'a SegExtraData<'wad>, start: u32, end: u32) -> Option<WallType<'a>> {
+        fn classify_segment<'a>(&self, seg_ex: &'a SegExtraData<'wad>, start: u32, end: u32) -> Option<WallType> {
             if start == end {
                 return None;
             }
-
-            // Seg reference
-            let seg = seg_ex.seg;
-
-            // Right is mandatory
-            let right_sector = seg.right_sector(&self.map)?;
-            
-            // Left only if it is a portal
-            if let Some(left_sector) = seg.left_sector(&self.map) {
-                
-                // Wall with window
-                if right_sector.floor_height != left_sector.floor_height 
-                || right_sector.ceiling_height != left_sector.ceiling_height {
-                   return Some(WallType::PortalWall(&seg_ex));
-                }
-
-                // Reject empty lines used for triggers and special events.
-                // identical floor and ceiling on both sides, identical
-                // light levels on both sides, and no middle texture.
-                if right_sector.ceiling_texture == left_sector.ceiling_texture 
-                && right_sector.floor_texture == left_sector.floor_texture
-                && right_sector.light_level == left_sector.light_level
-                && seg.line_defs(&self.map).right_side(&self.map)?.middle_texture == consts::VOID_TEXTURE {
-                    return None;
-                }
-
-                // Borders with different light levels and/or textures
-                return Some(WallType::PortalWall(&seg_ex));
-
-            } else {
-                return Some(WallType::SolidWall(&seg_ex));
-            }
+            return Some(seg_ex.wall_type.clone());
         }
 
         fn draw_line(&self, surface: &mut DoomSurface, x: i32, mut y1: i32, mut y2: i32, color: &[u8]) {
@@ -776,13 +783,13 @@ pub mod render_3d {
             }
         }
 
-        fn draw_wall<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wall>, start: u32, end: u32, wall_angle: f32) {
+        fn draw_wall<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &SegExtraData, wtype: &WallType, start: u32, end: u32, wall_angle: f32) {
             match wtype {
-                WallType::SolidWall(seg_ex) => {
+                WallType::SolidWall => {
                     // Alias
                     let seg = seg_ex.seg;
                     let line = seg.line_defs(&self.map);
-                    let side = line.front_side(&self.map).unwrap();
+                    let side = seg.side(&self.map).unwrap();
                     let sector = seg.front_sector(&self.map).unwrap();
                     let angle = actor.angle();
                     let position = actor.position();
@@ -948,11 +955,11 @@ pub mod render_3d {
                         wall_y2 += wall_y2_step;
                     }
                 },
-                WallType::PortalWall(seg_ex) => {
+                WallType::PortalWall => {
                     // Alias
                     let seg = seg_ex.seg;
                     let line = seg.line_defs(&self.map);
-                    let side = line.front_side(&self.map).unwrap();
+                    let side = seg.side(&self.map).unwrap();
                     let front_sector = seg.front_sector(&self.map).unwrap();
                     let back_sector = seg.back_sector(&self.map).unwrap();
                     let angle = actor.angle();
@@ -1287,10 +1294,13 @@ pub mod render_3d {
                         wall_y2 += wall_y2_step;
                     }
                 }
+                WallType::NoWall => {
+                    // ok
+                }
             }
         }
 
-        fn draw_clip_walls<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, wtype: &WallType<'wall>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
+        fn draw_clip_walls<'a, 'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &'a SegExtraData<'wad>, wtype: &WallType, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -1301,13 +1311,14 @@ pub mod render_3d {
                 }
                 let mut xe = xs;
                 while  xe < end && self.screen_range[xe as usize] {
-                    if let WallType::SolidWall(_) = wtype {
-                        self.screen_range[xe as usize] = false;
+                    match wtype {
+                        WallType::SolidWall =>  self.screen_range[xe as usize] = false,
+                        _ => {}
                     }
                     xe += 1;
                 }
                 if (xe - xs) > 0 {
-                    self.draw_wall(actor, surface, wtype, xs, xe, wall_angle);
+                    self.draw_wall(actor, surface, seg_ex, wtype, xs, xe, wall_angle);
                     xs = xe + 1;
                 } else {
                     break;
@@ -1339,7 +1350,7 @@ pub mod render_3d {
                             let vertex2= render.map.vertices[seg_ex.seg.end_vertex_id as usize];
                             if let Some((x1,x2, wall_angle)) = render.camera.clip_segment_in_frustum(actor.as_ref().borrow().as_ref(), &vertex1, &vertex2) {
                                if let Some(wtype) = render.classify_segment(&seg_ex, x1, x2){
-                                    render.draw_clip_walls(&actor.as_ref().borrow(), &mut surface.borrow_mut(), &wtype, x1,  x2, wall_angle);
+                                    render.draw_clip_walls(&actor.as_ref().borrow(), &mut surface.borrow_mut(), &seg_ex, &wtype, x1,  x2, wall_angle);
                                }
                             }                               
                         }

@@ -473,6 +473,14 @@ impl<'a> DataTextures<'a> {
                 ))
             }
         }
+        // Put unknown flat at the end
+        self.flats_names.push([0x01,b'U',b'N',b'K',b'N',b'O',b'W',b'N']); // Start with ASCII header start
+        self.flats.as_ref().borrow_mut().push(Rc::new(
+            Texture { 
+                size: Vector2::new(64, 64),
+                colors: self.unknown_flat()
+            }
+        ));
     }
 
     pub fn flat(&self, name: &[u8; 8]) -> Option<Rc<Texture<3>>> {
@@ -488,7 +496,17 @@ impl<'a> DataTextures<'a> {
         }
         None
     }
-        
+
+    pub fn get_flat_id(&self, name: &[u8; 8]) -> Option<usize> {
+        if let Some(index) = self.flats_names.iter().position(|flats_name| *flats_name == *name) {
+            return Some(index);
+        }
+        else if self.flats.as_ref().borrow().len() != 0 {
+            return Some(self.flats.as_ref().borrow().len() - 1);
+        }
+        None
+    }
+
     // Sprites
     fn extract_sprite_patches(&self, directories: &wad::DirectoryList, start: String, end: String) ->  Vec<Patch<'a>>  {
         let mut vec_t = vec![];   
@@ -686,6 +704,19 @@ impl<'a> DataTextures<'a> {
                 }
             }));
         }
+        // Put unknown texture at the end
+        self.texture_maps.push(&TextureMap {
+            name: [0x01,b'U',b'N',b'K',b'N',b'O',b'W',b'N'], // Start with ASCII header start
+            flags: 0,
+            size: [64,64],
+            __unusted__: 0,
+            patch_map_count: 0,
+            patch_maps: []
+        });
+        self.textures.as_ref().borrow_mut().push(Rc::new(Texture { 
+            size: Vector2::new(64, 64),
+            colors: self.unknown_texture()
+        }));
     }
 
     pub fn texture(&self, name: &[u8; 8]) -> Option<Rc<Texture<4>>> {
@@ -698,6 +729,16 @@ impl<'a> DataTextures<'a> {
     pub fn texture_id(&self, id: usize) -> Option<Rc<Texture<4>>> {
         if id < self.textures.as_ref().borrow().len() {
             return Some(self.textures.as_ref().borrow()[id].clone());
+        }
+        None
+    }
+
+    pub fn get_texture_id(&self, name: &[u8; 8]) -> Option<usize> {
+        if let Some(index) = self.texture_maps.iter().position(|map| map.name == *name) {
+            return Some(index);
+        }
+        else if self.textures.as_ref().borrow().len() != 0 {
+            return Some(self.textures.as_ref().borrow().len() - 1);
         }
         None
     }
