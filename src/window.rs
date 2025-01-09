@@ -78,21 +78,23 @@ impl DoomSurface {
 
     pub fn draw_lt(&mut self, position: &Vector2<usize>, color: &[u8]) {
         let size = self.pixels.texture().size();
+        
+        // Bounds check
+        // Disable by default
+        //if position.x >= size.width as usize || position.y >= size.height as usize {
+        //     return;
+        //}
+
+        // Get frame info
         let channels = self.pixels.texture().format().block_size(None).unwrap() as usize;
-        if position.x >= size.width as usize || position.y >= size.height as usize {
-            return;
-        }
         let frame = self.pixels.frame_mut();
-        let row_size = (size.width as usize) * channels; // 4 colors per byte
-        let offset: usize = position.y * row_size + position.x * channels;
-        let mut ptr = frame.as_mut_ptr();
-        unsafe {
-            ptr = ptr.add(offset);
-            for channel in color.iter() {
-                (*ptr) = *channel;
-                ptr = ptr.add(1);
-            }
-        }
+        let stride = size.width as usize * channels;
+        
+        // Calculate pixel offset once
+        let offset = position.y * stride + position.x * channels;
+        
+        // Use copy_from_slice for better performance with bounds checking
+        frame[offset..offset + color.len()].copy_from_slice(color);
     }
 
     pub fn draw_line_lt(&mut self, from: &Vector2<i32>, to: &Vector2<i32>, color: &[u8]) {
