@@ -485,12 +485,22 @@ pub mod render_3d {
         window: bool,
         wall_type: WallType
     }
-    
+
+    #[derive(Clone)]
+    struct MaskWall<'wad> {
+        seg_extra_data: Rc<SegExtraData<'wad>>,
+        start_x: u32,
+        end_x: u32,
+        upper_clip: Box<Vec<i32>>,
+        lower_clip: Box<Vec<i32>>,
+        angle: f32
+    }
+
     // Render 3D bsp
     #[derive(Clone)]
     pub struct RenderSoftware<'wad> {
         map: Rc<Map<'wad>>,
-        seg_extra_data: Vec<Box<SegExtraData<'wad>>>,
+        seg_extra_data: Vec<Rc<SegExtraData<'wad>>>,
         data_textures: Rc<DataTextures<'wad>>,
         size: Vector2<i32>,
         h_size: Vector2<f32>,
@@ -499,6 +509,7 @@ pub mod render_3d {
         screen_range: Vec<bool>,
         upper_clip: Box<Vec<i32>>,
         lower_clip: Box<Vec<i32>>,
+        mask_walls: Vec<MaskWall<'wad>>,
         sky_inv_scale: f32,
         sky_texture_alt: i16
     }
@@ -525,15 +536,16 @@ pub mod render_3d {
                 screen_range: vec![false; size.width() as usize],
                 upper_clip: Box::new(vec![0; size.width() as usize]),
                 lower_clip: Box::new(vec![size.height(); size.width() as usize]),
+                mask_walls: vec![],
                 sky_inv_scale : consts::SKY_SCALE / size.width() as f32,
-                sky_texture_alt : consts::SKY_ALT
+                sky_texture_alt : consts::SKY_ALT,
             }.preprocessing()
         }
 
         fn preprocessing(mut self) -> Self
         {
             for seg in &self.map.segs {
-                let seg_extra_data = SegExtraData {
+                self.seg_extra_data.push(Rc::new(SegExtraData {
                     seg: &seg,
                     ceiling_texture_id: seg
                                       .front_sector(&self.map)
@@ -634,8 +646,7 @@ pub mod render_3d {
                         wall_type
                     }
                     
-                };
-                self.seg_extra_data.push(Box::new(seg_extra_data));
+                }));
             }
             // Returns itself
             self
@@ -645,6 +656,7 @@ pub mod render_3d {
             self.screen_range.fill(true);
             self.upper_clip.fill(0);
             self.lower_clip.fill(self.size.height());
+            self.mask_walls.clear();
         }
 
         fn name_to_color(array: &[u8; 8], mut light_level: &f32) -> [u8; 4] {
@@ -692,13 +704,6 @@ pub mod render_3d {
             rgba
         }
         
-        fn classify_segment<'a>(&self, seg_ex: &'a SegExtraData<'wad>, start: u32, end: u32) -> Option<WallType> {
-            if start == end {
-                return None;
-            }
-            return Some(seg_ex.wall_type.clone());
-        }
-
         fn draw_line(&self, surface: &mut DoomSurface, x: i32, mut y1: i32, mut y2: i32, color: &[u8]) {
             y1 = math::clamp(y1, 0, self.size.height());
             y2 = math::clamp(y2, 0, self.size.height());
@@ -719,8 +724,8 @@ pub mod render_3d {
             texture_alt: i16, 
             inv_scale: f32,
             tex: &Texture<C>,
-            light_level: f32) 
-        {
+            light_level: f32
+        ) {
             let u = circual_tex(column, tex.size.width());
             if x < self.size.width() && y1 < y2 {
                 x += self.offset.x;
@@ -733,6 +738,37 @@ pub mod render_3d {
                     &Vector2::new(x as usize, y as usize), 
                     RenderSoftware::apply_light_to_color(&mut color, light_level)
                     );
+                    v += inv_scale;
+                }
+            }
+        }
+
+        fn draw_line_window<const C: usize>(
+            &self, 
+            surface: &mut DoomSurface, 
+            mut x: i32, 
+            mut y1: i32,
+            mut y2: i32, 
+            column: f32, 
+            texture_alt: i16, 
+            inv_scale: f32,
+            tex: &Texture<C>,
+            light_level: f32
+        ) {
+            let u = circual_tex(column, tex.size.width());
+            if x < self.size.width() && y1 < y2 {
+                x += self.offset.x;
+                y1 += self.offset.y;
+                y2 += self.offset.y;
+                let mut v: f32 = texture_alt as f32 + ((y1 as f32 - self.h_size.height()) * inv_scale);
+                for y in y1..y2 {
+                    let mut color = tex.get(u, circual_tex(v, tex.size.height())).clone();
+                    if color != [0; C] {
+                        surface.draw_lt(
+                        &Vector2::new(x as usize, y as usize), 
+                        RenderSoftware::apply_light_to_color(&mut color, light_level)
+                        );
+                    }
                     v += inv_scale;
                 }
             }
@@ -783,8 +819,8 @@ pub mod render_3d {
             }
         }
 
-        fn draw_wall<'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &SegExtraData, wtype: &WallType, start: u32, end: u32, wall_angle: f32) {
-            match wtype {
+        fn draw_wall<'a, 'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &Rc<SegExtraData<'wad>>, start: u32, end: u32, wall_angle: f32) {
+            match seg_ex.wall_type {
                 WallType::SolidWall => {
                     // Alias
                     let seg = seg_ex.seg;
@@ -1002,6 +1038,17 @@ pub mod render_3d {
                     || front_sector.floor_texture != back_sector.floor_texture {
                         b_draw_lower_wall = floor_texture.is_some() && back_wall_floor > front_wall_floor;
                         b_draw_floor = front_wall_floor <= 0;
+                    }                    
+                    // Windows?
+                    if seg_ex.wall_texture_id.is_some() == true {
+                        self.mask_walls.push(MaskWall {
+                            seg_extra_data: seg_ex.clone(), 
+                            start_x: start, 
+                            end_x: end, 
+                            upper_clip: self.upper_clip.clone(),
+                            lower_clip: self.lower_clip.clone(),
+                            angle: wall_angle,
+                        });
                     }
                     // Test
                     if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
@@ -1091,14 +1138,14 @@ pub mod render_3d {
                     let mut portal_y1 = wall_y2;
                     let mut portal_y1_step = wall_y2_step;
                     if b_draw_upper_wall && back_wall_ceiling > front_wall_floor {
-                            portal_y1 = half_height - back_wall_ceiling as f32 * wall_scale_1;
-                            portal_y1_step = -wall_scale_step * back_wall_ceiling as f32;
+                        portal_y1 = half_height - back_wall_ceiling as f32 * wall_scale_1;
+                        portal_y1_step = -wall_scale_step * back_wall_ceiling as f32;
                     }
                     let mut portal_y2 = wall_y1;
                     let mut portal_y2_step = wall_y1_step;
                     if b_draw_lower_wall && back_wall_floor < front_wall_ceiling {
-                            portal_y2 = half_height - back_wall_floor as f32 * wall_scale_1;
-                            portal_y2_step = -wall_scale_step * back_wall_floor as f32;
+                        portal_y2 = half_height - back_wall_floor as f32 * wall_scale_1;
+                        portal_y2_step = -wall_scale_step * back_wall_floor as f32;
                     }
 
                     // Draw
@@ -1114,7 +1161,6 @@ pub mod render_3d {
                                 (0.0,0.0)
                             }
                         };
-
 
                         if b_draw_upper_wall {
                             if b_draw_ceiling {
@@ -1293,6 +1339,7 @@ pub mod render_3d {
                         wall_y1 += wall_y1_step;
                         wall_y2 += wall_y2_step;
                     }
+
                 }
                 WallType::NoWall => {
                     // ok
@@ -1300,7 +1347,119 @@ pub mod render_3d {
             }
         }
 
-        fn draw_clip_walls<'a, 'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &'a SegExtraData<'wad>, wtype: &WallType, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
+        fn draw_windows<'a, 'wall>(&self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, mask_wall: &MaskWall<'wad>) {
+             // Alias
+             let seg_ex = &mask_wall.seg_extra_data;
+             let start = mask_wall.start_x;
+             let end = mask_wall.end_x;
+             let wall_angle = mask_wall.angle;
+             let seg = seg_ex.seg;
+             let line = seg.line_defs(&self.map);
+             let side = seg.side(&self.map).unwrap();
+             let sector = seg.front_sector(&self.map).unwrap();
+             let angle = actor.angle();
+             let position = actor.position();
+             let height = actor.height();
+             let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
+             let half_height = self.h_size.height();
+             // Texture
+             let light_level = seg_ex.light_level;
+             // Get texture
+             let wall_texture = seg_ex.wall_texture_id.and_then(|id| self.data_textures.texture_id(id));
+             // Height of wall w/ rispect to player
+             let wall_ceiling = sector.ceiling_height - height;
+             let wall_floor = sector.floor_height - height;
+             // What to draw
+             let b_draw_wall = wall_texture.is_some();
+             // Calculate the scaling factors of the left and right edges of the wall range
+             let wall_normal_angle = seg.float_degrees_angle() + 90.0;
+             let offset_angle = wall_normal_angle - wall_angle;
+             // Wall distance
+             let hypotenuse = position.distance(&start_vertex);
+             let wall_distance = hypotenuse * math::radians(offset_angle).cos();
+             // Test
+             if !b_draw_wall {
+                 return;
+             }
+             // Compute scale
+             let wall_scale_1 = math::clamp(
+                 self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
+                 consts::MIN_SCALE, 
+                 consts::MAX_SCALE
+             );
+             let wall_scale_step = {
+                 if start < end {
+                     let wall_scale_2 = math::clamp(
+                         self.camera.scale_from_global_angle(end, wall_normal_angle, wall_distance, angle), 
+                         consts::MIN_SCALE, 
+                         consts::MAX_SCALE
+                     );
+                     (wall_scale_2 - wall_scale_1) / (end - start) as f32
+                 } else {
+                     0.0
+                 }
+             };
+             //////////////////////////////////////////////////////////////////////////////
+             // Determine how the wall textures are horizontally aligned
+             let mut wall_offset = hypotenuse * math::radians(offset_angle).sin();
+             wall_offset += seg.offset as f32 + side.offset.x as f32;
+             let wall_center_angle = wall_normal_angle - angle;
+             // Texture height
+             let middle_texture_alt = {
+                 if let Some(ref texture) = wall_texture {
+                     if line.has_flag(LineDefFlags::DontPegBottom) { 
+                         wall_floor + texture.size.y as i16 + side.offset.y  
+                     } else {
+                         wall_ceiling + side.offset.y  
+                     }
+                 } else {
+                     0
+                 }
+             };
+             // Texture scale
+             let mut wall_tex_y_scale = wall_scale_1;
+             //////////////////////////////////////////////////////////////////////////////
+             // Determine where on the screen the wall is drawn
+             // Top wall
+             let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale_1;
+             let wall_y1_step = -wall_scale_step * wall_ceiling as f32;
+             // Bottom wall
+             let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
+             let wall_y2_step = -wall_scale_step * wall_floor as f32;
+             // Draw
+             for x in start..end {
+                 let draw_wall_y1 = wall_y1 as i32;
+                 let draw_wall_y2 = wall_y2 as i32;
+                 if b_draw_wall {
+                     let middle_wall_y1 = math::max(draw_wall_y1, mask_wall.upper_clip[x as usize]);
+                     let middle_wall_y2 = math::min(draw_wall_y2, mask_wall.lower_clip[x as usize]);
+                     if middle_wall_y1 < middle_wall_y2 {
+                         if let Some(ref texture) = wall_texture { 
+                             let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
+                             let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
+                             let inv_scale =  1.0 / wall_tex_y_scale;
+                             self.draw_line_window(
+                                 surface, 
+                                 x as i32, 
+                                 middle_wall_y1, 
+                                 middle_wall_y2, 
+                                 texture_column, 
+                                 middle_texture_alt, 
+                                 inv_scale, 
+                             texture.as_ref(), 
+                                 light_level
+                             );
+                         }
+                     }
+                 }
+                 // Next step
+                 wall_tex_y_scale += wall_scale_step;
+                 wall_y1 += wall_y1_step;
+                 wall_y2 += wall_y2_step;
+             }
+        }
+
+        fn draw_clip_walls<'a, 'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &Rc<SegExtraData<'wad>>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
             let mut xs = wall_x_start;
             let end = math::min(wall_x_end, self.screen_range.len() as u32);
 
@@ -1311,20 +1470,44 @@ pub mod render_3d {
                 }
                 let mut xe = xs;
                 while  xe < end && self.screen_range[xe as usize] {
-                    match wtype {
+                    match seg_ex.wall_type {
                         WallType::SolidWall =>  self.screen_range[xe as usize] = false,
                         _ => {}
                     }
                     xe += 1;
                 }
                 if (xe - xs) > 0 {
-                    self.draw_wall(actor, surface, seg_ex, wtype, xs, xe, wall_angle);
+                    self.draw_wall(actor, surface, &seg_ex, xs, xe, wall_angle);
                     xs = xe + 1;
                 } else {
                     break;
                 }
             }
             return self.screen_range.contains(&true);
+        }
+    
+        fn draw_subsector(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, subsector_id: u16) {
+            let subsector = self.map.sub_sectors[subsector_id as usize];
+            for sector_id in subsector.iter() {
+                let seg_ex = self.seg_extra_data[sector_id as usize].clone();
+                let vertex1= self.map.vertices[seg_ex.seg.start_vertex_id as usize];
+                let vertex2= self.map.vertices[seg_ex.seg.end_vertex_id as usize];
+                if let Some((x1,x2, wall_angle)) = self.camera.clip_segment_in_frustum(actor.as_ref(), &vertex1, &vertex2) {
+                   if x1 != x2 {
+                        self.draw_clip_walls(&actor, surface, &seg_ex, x1, x2, wall_angle);
+                   }
+                }
+            }
+        }
+
+        fn draw_mask_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface) {
+            for mask_wall in self.mask_walls.iter().rev() {
+                self.draw_windows(
+                    &actor, 
+                    surface, 
+                    &mask_wall
+                );
+            }
         }
     }
 
@@ -1339,25 +1522,18 @@ pub mod render_3d {
             // Draw player 1
             match doom.actors.iter().find(|&actor| actor.as_ref().borrow().type_id() == 1) {
                 Some(actor) => {
+                    // Draw wall
                     bsp.visit(
                         &actor.as_ref().borrow().get_transform().position_as_int(), 
                         render,
                         |subsector_id, render|{
-                        let subsector = render.map.sub_sectors[subsector_id as usize];
-                        for sector_id in subsector.iter() {
-                            let seg_ex = render.seg_extra_data[sector_id as usize].clone();
-                            let vertex1= render.map.vertices[seg_ex.seg.start_vertex_id as usize];
-                            let vertex2= render.map.vertices[seg_ex.seg.end_vertex_id as usize];
-                            if let Some((x1,x2, wall_angle)) = render.camera.clip_segment_in_frustum(actor.as_ref().borrow().as_ref(), &vertex1, &vertex2) {
-                               if let Some(wtype) = render.classify_segment(&seg_ex, x1, x2){
-                                    render.draw_clip_walls(&actor.as_ref().borrow(), &mut surface.borrow_mut(), &seg_ex, &wtype, x1,  x2, wall_angle);
-                               }
-                            }                               
-                        }
+                        render.draw_subsector(&actor.as_ref().borrow(), &mut surface.borrow_mut(), subsector_id);
                         return  true;
                     },|node_box, render| { 
                         render.camera.is_box_in_frustum(actor.as_ref().borrow().as_ref(), &node_box)
                     });
+                    // Draw mask walls
+                    render.draw_mask_walls(&actor.as_ref().borrow(), &mut surface.borrow_mut());
                 },
                 None => ()
             } 

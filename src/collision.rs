@@ -191,11 +191,35 @@ impl <'wad> CollisionSolver<'wad> {
         map: &Map<'a>,
         line: &LineDef,
     ) -> Vector2<T> {
-        let velocity = *newposition - *position;
-        let velocity_length = velocity.magnitude();
         // Get line segment points (note: fixed order from end to start)
         let wall_start = Vector2::<T>::from(&line.start_vertex(&map));
         let wall_end = Vector2::<T>::from(&line.end_vertex(&map));
+        if line.has_flag(LineDefFlags::TwoSided) {
+            // Calculate which side to test
+            let cross_product = (position.x - wall_start.x) * (wall_end.y - wall_start.y) -
+                                   (position.y - wall_start.y) * (wall_end.x - wall_start.x);
+            if cross_product > T::zero() {
+                // Test side 1
+                return self.try_move_side(&position, newposition, radius, &wall_start, &wall_end);
+            } else {
+                // Test side 2
+                return self.try_move_side(&position, newposition, radius, &wall_end, &wall_start);
+            }
+        } else {
+            return self.try_move_side(&position, newposition, radius, &wall_start, &wall_end);
+        }
+    }
+
+    fn try_move_side<'a, T: Float + Sized + Copy + NumCast + Default + Div + Display>(
+        &self,
+        position: &Vector2<T>,
+        newposition: &Vector2<T>,
+        radius: T,
+        wall_start: &Vector2<T>,
+        wall_end: &Vector2<T>,
+    ) -> Vector2<T> {
+        let velocity = *newposition - *position;
+        let velocity_length = velocity.magnitude();
         
         // If velocity is small enough, use single check
         if velocity_length <= radius {
