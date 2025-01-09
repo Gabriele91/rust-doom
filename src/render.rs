@@ -446,8 +446,8 @@ pub mod render_3d {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     use std::rc::Rc;
-    use crate::actors::Actor;
     // Use engine
+    use crate::actors::Actor;
     use crate::camera::Camera;
     use crate::{configure, math};
     use crate::doom::Doom;
@@ -456,6 +456,10 @@ pub mod render_3d {
     use crate::shape::Size;
     use crate::window::DoomSurface;
     use crate::data_textures::{Texture, DataTextures, is_sky_texture, remap_sky_texture};
+    // For simd
+    #[cfg(all(target_arch = "x86_64", target_feature = "sse4.1"))]
+    use std::arch::x86_64::*;
+
 
     mod consts {
         pub const VOID_TEXTURE : [u8; 8] = ['-' as u8,0,0,0, 0,0,0,0];
@@ -513,14 +517,9 @@ pub mod render_3d {
         sky_inv_scale: f32,
         sky_texture_alt: i16
     }
-
-    fn circual_tex(value:f32, size: u16) -> u16 {
-        let mod_value = value % size as f32;
-        if mod_value < 0.0 {
-            (mod_value + size as f32 - 1.0) as u16
-        } else {
-            mod_value as u16
-        }
+    #[inline(always)]
+    fn circular_tex(value: f32, size: u16) -> u16 {
+        (value as i32).rem_euclid(size as i32) as u16
     }
 
     impl<'wad> RenderSoftware<'wad> {
@@ -691,19 +690,40 @@ pub mod render_3d {
                     rgba[0] = (rgba[0] as f32 * light_level) as u8;
                 },
                 2 => {
-                    rgba[0] = (rgba[0] as f32 * light_level) as u8;
-                    rgba[1] = (rgba[1] as f32 * light_level) as u8;
+                    let light_int = (light_level * 256.0) as u16;
+                    rgba[0] = ((rgba[0] as u16 * light_int) >> 8) as u8;
+                    rgba[1] = ((rgba[1] as u16 * light_int) >> 8) as u8;
                 },
+                #[cfg(not(all(target_arch = "x86_64", target_feature = "sse4.1")))]
                 3 | 4 => {
-                    rgba[0] = (rgba[0] as f32 * light_level) as u8;
-                    rgba[1] = (rgba[1] as f32 * light_level) as u8;
-                    rgba[2] = (rgba[2] as f32 * light_level) as u8;
+                    let light_int = (light_level * 256.0) as u16;
+                    rgba[0] = ((rgba[0] as u16 * light_int) >> 8) as u8;
+                    rgba[1] = ((rgba[1] as u16 * light_int) >> 8) as u8;
+                    rgba[2] = ((rgba[2] as u16 * light_int) >> 8) as u8;
+                }
+                #[cfg(all(target_arch = "x86_64", target_feature = "sse4.1"))]
+                3 | 4 => unsafe {
+                    let light = _mm_set1_ps(light_level);
+                    let color = _mm_set_ps(
+                        0.0 as f32,
+                        rgba[2] as f32,
+                        rgba[1] as f32,
+                        rgba[0] as f32
+                    );
+                    
+                    let result = _mm_mul_ps(color, light);
+                    let integers = _mm_cvtps_epi32(result);
+                    
+                    rgba[0] = _mm_extract_epi8(integers as __m128i, 0) as u8;
+                    rgba[1] = _mm_extract_epi8(integers as __m128i, 4) as u8;
+                    rgba[2] = _mm_extract_epi8(integers as __m128i, 8) as u8;
+                    return rgba;
                 },
                 _ => panic!("Unsupported"),
             }
             rgba
         }
-        
+
         fn draw_line(&self, surface: &mut DoomSurface, x: i32, mut y1: i32, mut y2: i32, color: &[u8]) {
             y1 = math::clamp(y1, 0, self.size.height());
             y2 = math::clamp(y2, 0, self.size.height());
@@ -726,14 +746,14 @@ pub mod render_3d {
             tex: &Texture<C>,
             light_level: f32
         ) {
-            let u = circual_tex(column, tex.size.width());
+            let u = circular_tex(column, tex.size.width());
             if x < self.size.width() && y1 < y2 {
                 x += self.offset.x;
                 y1 += self.offset.y;
                 y2 += self.offset.y;
                 let mut v: f32 = texture_alt as f32 + ((y1 as f32 - self.h_size.height()) * inv_scale);
                 for y in y1..y2 {
-                    let mut color = tex.get(u, circual_tex(v, tex.size.height())).clone();
+                    let mut color = tex.get(u, circular_tex(v, tex.size.height())).clone();
                     surface.draw_lt(
                     &Vector2::new(x as usize, y as usize), 
                     RenderSoftware::apply_light_to_color(&mut color, light_level)
@@ -755,14 +775,14 @@ pub mod render_3d {
             tex: &Texture<C>,
             light_level: f32
         ) {
-            let u = circual_tex(column, tex.size.width());
+            let u = circular_tex(column, tex.size.width());
             if x < self.size.width() && y1 < y2 {
                 x += self.offset.x;
                 y1 += self.offset.y;
                 y2 += self.offset.y;
                 let mut v: f32 = texture_alt as f32 + ((y1 as f32 - self.h_size.height()) * inv_scale);
                 for y in y1..y2 {
-                    let mut color = tex.get(u, circual_tex(v, tex.size.height())).clone();
+                    let mut color = tex.get(u, circular_tex(v, tex.size.height())).clone();
                     if color != [0; C] {
                         surface.draw_lt(
                         &Vector2::new(x as usize, y as usize), 
@@ -806,8 +826,8 @@ pub mod render_3d {
                     let dx = (right_x - left_x) / self.size.width() as f32;
                     let dy = (right_y - left_y) / self.size.width() as f32;
         
-                    let tx = circual_tex(left_x + dx * x as f32, tex.size.width());
-                    let ty = circual_tex(left_y + dy * x as f32, tex.size.height());
+                    let tx = circular_tex(left_x + dx * x as f32, tex.size.width());
+                    let ty = circular_tex(left_y + dy * x as f32, tex.size.height());
         
                     let mut color = tex.get(tx, ty).clone();
 
