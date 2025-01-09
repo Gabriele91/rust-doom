@@ -849,7 +849,7 @@ pub mod render_3d {
                     let sector = seg.front_sector(&self.map).unwrap();
                     let angle = actor.angle();
                     let position = actor.position();
-                    let height = actor.height();
+                    let height = actor.get_transform().height_as_int();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Texture
@@ -1020,7 +1020,7 @@ pub mod render_3d {
                     let back_sector = seg.back_sector(&self.map).unwrap();
                     let angle = actor.angle();
                     let position = actor.position();
-                    let height = actor.height();
+                    let height = actor.get_transform().height_as_int();
                     let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
                     let half_height = self.h_size.height();
                     // Get texture
@@ -1379,7 +1379,7 @@ pub mod render_3d {
              let sector = seg.front_sector(&self.map).unwrap();
              let angle = actor.angle();
              let position = actor.position();
-             let height = actor.height();
+             let height = actor.get_transform().height_as_int();
              let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
              let half_height = self.h_size.height();
              // Texture
