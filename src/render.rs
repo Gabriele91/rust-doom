@@ -491,13 +491,27 @@ pub mod render_3d {
     }
 
     #[derive(Clone)]
+    struct DrawMaskWallInfo {
+        hypotenuse: f32,
+        // Scale
+        distance: f32,
+        scale: f32,
+        scale_step: f32,
+        // Angle
+        angle: f32,
+        normal_angle: f32,
+        offset_angle: f32
+    } 
+
+    #[derive(Clone)]
     struct MaskWall<'wad> {
         seg_extra_data: Rc<SegExtraData<'wad>>,
         start_x: u32,
         end_x: u32,
         upper_clip: Box<Vec<i32>>,
         lower_clip: Box<Vec<i32>>,
-        angle: f32
+        // Wall info
+        draw_info: DrawMaskWallInfo
     }
 
     // Render 3D bsp
@@ -1040,6 +1054,7 @@ pub mod render_3d {
                     let mut b_draw_ceiling = false;
                     let mut b_draw_floor = false;
                     let mut b_draw_lower_wall = false;
+                    let mut b_draw_windows = seg_ex.wall_texture_id.is_some();
                     let b_ceiling_is_sky= sky_texture.is_some();
                     // Test if the upper is a sky
                     if  front_sector.ceiling_texture == back_sector.ceiling_texture && b_ceiling_is_sky {
@@ -1058,20 +1073,11 @@ pub mod render_3d {
                     || front_sector.floor_texture != back_sector.floor_texture {
                         b_draw_lower_wall = floor_texture.is_some() && back_wall_floor > front_wall_floor;
                         b_draw_floor = front_wall_floor <= 0;
-                    }                    
-                    // Windows?
-                    if seg_ex.wall_texture_id.is_some() == true {
-                        self.mask_walls.push(MaskWall {
-                            seg_extra_data: seg_ex.clone(), 
-                            start_x: start, 
-                            end_x: end, 
-                            upper_clip: self.upper_clip.clone(),
-                            lower_clip: self.lower_clip.clone(),
-                            angle: wall_angle,
-                        });
                     }
-                    // Test
-                    if !b_draw_upper_wall && !b_draw_ceiling && !b_draw_floor && !b_draw_lower_wall {
+                    // Draw portal?
+                    let b_draw_portal = b_draw_upper_wall || b_draw_ceiling || b_draw_floor || b_draw_lower_wall;
+                    // Do not compute if this is a void portal
+                    if !b_draw_windows && !b_draw_portal {
                         return;
                     }
                     // Calculate the scaling factors of the left and right edges of the wall range
@@ -1081,23 +1087,48 @@ pub mod render_3d {
                     let hypotenuse = position.distance(&start_vertex);
                     let wall_distance = hypotenuse * math::radians(offset_angle).cos();
                     // Compute scale
-                    let wall_scale_1 = math::clamp(
+                    let wall_scale = math::clamp(
                         self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
                         consts::MIN_SCALE, 
                         consts::MAX_SCALE
                     );
                     let wall_scale_step = {
                         if start < end {
-                            let wall_scale_2 = math::clamp(
+                            let wall_scale_inv = math::clamp(
                                 self.camera.scale_from_global_angle(end, wall_normal_angle, wall_distance, angle), 
                                 consts::MIN_SCALE, 
                                 consts::MAX_SCALE
                             );
-                            (wall_scale_2 - wall_scale_1) / (end - start) as f32
+                            (wall_scale_inv - wall_scale) / (end - start) as f32
                         } else {
                             0.0
                         }
-                    };                    
+                    };
+                    // Windows?
+                    if seg_ex.wall_texture_id.is_some() {
+                        self.mask_walls.push(MaskWall {
+                            seg_extra_data: seg_ex.clone(), 
+                            start_x: start, 
+                            end_x: end, 
+                            upper_clip: self.upper_clip.clone(),
+                            lower_clip: self.lower_clip.clone(),
+                            draw_info : DrawMaskWallInfo {
+                                hypotenuse: hypotenuse,
+                                // Scale
+                                distance: wall_distance,
+                                scale: wall_scale,
+                                scale_step: wall_scale_step,
+                                // Angle
+                                angle: wall_angle,
+                                normal_angle: wall_normal_angle,
+                                offset_angle: offset_angle
+                            }
+                        });
+                    }
+                    // Draw portal?
+                    if !b_draw_portal {
+                        return;
+                    }
                     //////////////////////////////////////////////////////////////////////////////
                     // Determine how the wall textures are horizontally aligned
                     struct TextureDrawData 
@@ -1146,25 +1177,25 @@ pub mod render_3d {
                         }
                     };
                     // Texture scale
-                    let mut wall_tex_y_scale = wall_scale_1;
+                    let mut wall_tex_y_scale = wall_scale;
                     // Determine where on the screen the wall is drawn
                     // Top wall
-                    let mut wall_y1 = half_height - front_wall_ceiling as f32 * wall_scale_1;
+                    let mut wall_y1 = half_height - front_wall_ceiling as f32 * wall_scale;
                     let wall_y1_step = -wall_scale_step * front_wall_ceiling as f32;
                     // Bottom wall
-                    let mut wall_y2 = half_height - front_wall_floor as f32 * wall_scale_1;
+                    let mut wall_y2 = half_height - front_wall_floor as f32 * wall_scale;
                     let wall_y2_step = -wall_scale_step * front_wall_floor as f32;
                     // Determinate y for the top and bottom walls
                     let mut portal_y1 = wall_y2;
                     let mut portal_y1_step = wall_y2_step;
                     if b_draw_upper_wall && back_wall_ceiling > front_wall_floor {
-                        portal_y1 = half_height - back_wall_ceiling as f32 * wall_scale_1;
+                        portal_y1 = half_height - back_wall_ceiling as f32 * wall_scale;
                         portal_y1_step = -wall_scale_step * back_wall_ceiling as f32;
                     }
                     let mut portal_y2 = wall_y1;
                     let mut portal_y2_step = wall_y1_step;
                     if b_draw_lower_wall && back_wall_floor < front_wall_ceiling {
-                        portal_y2 = half_height - back_wall_floor as f32 * wall_scale_1;
+                        portal_y2 = half_height - back_wall_floor as f32 * wall_scale;
                         portal_y2_step = -wall_scale_step * back_wall_floor as f32;
                     }
 
@@ -1372,15 +1403,12 @@ pub mod render_3d {
              let seg_ex = &mask_wall.seg_extra_data;
              let start = mask_wall.start_x;
              let end = mask_wall.end_x;
-             let wall_angle = mask_wall.angle;
              let seg = seg_ex.seg;
              let line = seg.line_defs(&self.map);
              let side = seg.side(&self.map).unwrap();
              let sector = seg.front_sector(&self.map).unwrap();
              let angle = actor.angle();
-             let position = actor.position();
              let height = actor.get_transform().height_as_int();
-             let start_vertex = Vector2::<f32>::from( seg.start_vertex(&self.map) );
              let half_height = self.h_size.height();
              // Texture
              let light_level = seg_ex.light_level;
@@ -1391,34 +1419,17 @@ pub mod render_3d {
              let wall_floor = sector.floor_height - height;
              // What to draw
              let b_draw_wall = wall_texture.is_some();
-             // Calculate the scaling factors of the left and right edges of the wall range
-             let wall_normal_angle = seg.float_degrees_angle() + 90.0;
-             let offset_angle = wall_normal_angle - wall_angle;
-             // Wall distance
-             let hypotenuse = position.distance(&start_vertex);
-             let wall_distance = hypotenuse * math::radians(offset_angle).cos();
              // Test
              if !b_draw_wall {
                  return;
              }
-             // Compute scale
-             let wall_scale_1 = math::clamp(
-                 self.camera.scale_from_global_angle(start, wall_normal_angle, wall_distance, angle), 
-                 consts::MIN_SCALE, 
-                 consts::MAX_SCALE
-             );
-             let wall_scale_step = {
-                 if start < end {
-                     let wall_scale_2 = math::clamp(
-                         self.camera.scale_from_global_angle(end, wall_normal_angle, wall_distance, angle), 
-                         consts::MIN_SCALE, 
-                         consts::MAX_SCALE
-                     );
-                     (wall_scale_2 - wall_scale_1) / (end - start) as f32
-                 } else {
-                     0.0
-                 }
-             };
+             // Wall draw info
+             let hypotenuse = mask_wall.draw_info.hypotenuse;
+             let wall_distance = mask_wall.draw_info.distance;
+             let wall_scale = mask_wall.draw_info.scale;
+             let wall_scale_step = mask_wall.draw_info.scale_step;
+             let wall_normal_angle = mask_wall.draw_info.normal_angle;
+             let offset_angle = mask_wall.draw_info.offset_angle;
              //////////////////////////////////////////////////////////////////////////////
              // Determine how the wall textures are horizontally aligned
              let mut wall_offset = hypotenuse * math::radians(offset_angle).sin();
@@ -1437,14 +1448,14 @@ pub mod render_3d {
                  }
              };
              // Texture scale
-             let mut wall_tex_y_scale = wall_scale_1;
+             let mut wall_tex_y_scale = wall_scale;
              //////////////////////////////////////////////////////////////////////////////
              // Determine where on the screen the wall is drawn
              // Top wall
-             let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale_1;
+             let mut wall_y1 = half_height - wall_ceiling as f32 * wall_scale;
              let wall_y1_step = -wall_scale_step * wall_ceiling as f32;
              // Bottom wall
-             let mut wall_y2 = half_height - wall_floor as f32 * wall_scale_1;
+             let mut wall_y2 = half_height - wall_floor as f32 * wall_scale;
              let wall_y2_step = -wall_scale_step * wall_floor as f32;
              // Draw
              for x in start..end {
