@@ -1385,6 +1385,7 @@ pub mod render_3d {
                                 self.lower_clip[x as usize] = floor_wall_y1;
                             }
                         }
+                        
                         // Next step
                         wall_tex_y_scale += wall_scale_step;
                         wall_y1 += wall_y1_step;
@@ -1459,34 +1460,32 @@ pub mod render_3d {
              let wall_y2_step = -wall_scale_step * wall_floor as f32;
              // Draw
              for x in start..end {
-                 let draw_wall_y1 = wall_y1 as i32;
-                 let draw_wall_y2 = wall_y2 as i32;
-                 if b_draw_wall {
-                     let middle_wall_y1 = math::max(draw_wall_y1, mask_wall.upper_clip[x as usize]);
-                     let middle_wall_y2 = math::min(draw_wall_y2, mask_wall.lower_clip[x as usize]);
-                     if middle_wall_y1 < middle_wall_y2 {
-                         if let Some(ref texture) = wall_texture { 
-                             let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
-                             let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
-                             let inv_scale =  1.0 / wall_tex_y_scale;
-                             self.draw_line_window(
-                                 surface, 
-                                 x as i32, 
-                                 middle_wall_y1, 
-                                 middle_wall_y2, 
-                                 texture_column, 
-                                 middle_texture_alt, 
-                                 inv_scale, 
-                             texture.as_ref(), 
-                                 light_level
-                             );
-                         }
-                     }
-                 }
-                 // Next step
-                 wall_tex_y_scale += wall_scale_step;
-                 wall_y1 += wall_y1_step;
-                 wall_y2 += wall_y2_step;
+                let draw_wall_y1 = wall_y1 as i32;
+                let draw_wall_y2 = wall_y2 as i32;
+                let middle_wall_y1 = math::max(draw_wall_y1, mask_wall.upper_clip[x as usize]);
+                let middle_wall_y2 = math::min(draw_wall_y2, mask_wall.lower_clip[x as usize]);
+                if middle_wall_y1 < middle_wall_y2 {
+                    if let Some(ref texture) = wall_texture { 
+                        let wall_angle = wall_center_angle - self.camera.x_to_angle(x);
+                        let texture_column = wall_distance * radians(wall_angle).tan() - wall_offset;
+                        let inv_scale =  1.0 / wall_tex_y_scale;
+                        self.draw_line_window(
+                            surface, 
+                            x as i32, 
+                            middle_wall_y1, 
+                            middle_wall_y2, 
+                            texture_column, 
+                            middle_texture_alt, 
+                            inv_scale, 
+                            texture.as_ref(), 
+                            light_level
+                        );
+                    }
+                }
+                // Next step
+                wall_tex_y_scale += wall_scale_step;
+                wall_y1 += wall_y1_step;
+                wall_y2 += wall_y2_step;
              }
         }
 
