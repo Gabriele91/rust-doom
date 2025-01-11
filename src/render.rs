@@ -1491,15 +1491,15 @@ pub mod render_3d {
 
         fn draw_clip_walls<'a, 'wall>(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, seg_ex: &Rc<SegExtraData<'wad>>, wall_x_start: u32, wall_x_end: u32, wall_angle: f32) -> bool {
             let mut xs = wall_x_start;
-            let end = math::min(wall_x_end, self.screen_range.len() as u32);
+            let xend = math::min(wall_x_end, self.screen_range.len() as u32);
 
-            while xs < end {         
+            while xs < xend {         
                 if !self.screen_range[xs as usize] {
                     xs += 1;
                     continue;
                 }
                 let mut xe = xs;
-                while  xe < end && self.screen_range[xe as usize] {
+                while  xe < xend && self.screen_range[xe as usize] {
                     match seg_ex.wall_type {
                         WallType::SolidWall =>  self.screen_range[xe as usize] = false,
                         _ => {}
@@ -1516,7 +1516,7 @@ pub mod render_3d {
             return self.screen_range.contains(&true);
         }
     
-        fn draw_subsector(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, subsector_id: u16) {
+        fn draw_subsector(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface, subsector_id: u16) -> bool {
             let subsector = self.map.sub_sectors[subsector_id as usize];
             for sector_id in subsector.iter() {
                 let seg_ex = self.seg_extra_data[sector_id as usize].clone();
@@ -1524,10 +1524,13 @@ pub mod render_3d {
                 let vertex2= self.map.vertices[seg_ex.seg.end_vertex_id as usize];
                 if let Some((x1,x2, wall_angle)) = self.camera.clip_segment_in_frustum(actor.as_ref(), &vertex1, &vertex2) {
                    if x1 != x2 {
-                        self.draw_clip_walls(&actor, surface, &seg_ex, x1, x2, wall_angle);
+                        if !self.draw_clip_walls(&actor, surface, &seg_ex, x1, x2, wall_angle) {
+                            return false;
+                        }
                    }
                 }
             }
+            return true;
         }
 
         fn draw_mask_walls(&mut self, actor: &Box<dyn Actor>, surface: &mut DoomSurface) {
@@ -1557,8 +1560,7 @@ pub mod render_3d {
                         &actor.as_ref().borrow().get_transform().position_as_int(), 
                         render,
                         |subsector_id, render|{
-                        render.draw_subsector(&actor.as_ref().borrow(), &mut surface.borrow_mut(), subsector_id);
-                        return  true;
+                        return render.draw_subsector(&actor.as_ref().borrow(), &mut surface.borrow_mut(), subsector_id);
                     },|node_box, render| { 
                         render.camera.is_box_in_frustum(actor.as_ref().borrow().as_ref(), &node_box)
                     });
