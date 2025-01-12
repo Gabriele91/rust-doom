@@ -34,8 +34,8 @@ pub struct Player {
     pub speed: f32,
     pub angle_speed: f32,
     // jump
-    pub jump: i16,
-    pub jump_speed: i16
+    pub jump: f32,
+    pub jump_speed: f32
 }
 
 #[readonly::make]
@@ -147,10 +147,10 @@ impl Player {
     // Default constants
     const DEFAULT_SIZE: u16 = 16;
     const DEFAULT_HEIGHT: i16 = 56;
-    const DEFAULT_SPEED: f32 = 1.0;
-    const DEFAULT_ANGLE_SPEED: f32 = 0.5;
-    const DEFAULT_JUMP: i16 = 10;
-    const DEFAULT_JUMP_SPEED: i16 = 2;
+    const DEFAULT_SPEED: f32 = 60.0;
+    const DEFAULT_ANGLE_SPEED: f32 = 30.0;
+    const DEFAULT_JUMP: f32 = 600.0;
+    const DEFAULT_JUMP_SPEED: f32 = 120.0;
 
     pub fn from(props: &Properties) -> Option<Self> {
         Some(Player {

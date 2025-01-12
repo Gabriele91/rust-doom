@@ -15,7 +15,7 @@ use winit_input_helper::WinitInputHelper;
 pub struct Transform {
     pub position: Vector2<f32>,
     pub angle: f32,
-    pub height: i16
+    pub height: f32
 }
 
 impl Transform {
@@ -23,11 +23,11 @@ impl Transform {
         Transform {
             position: Vector2::new(0.0,0.0),
             angle: 0.0,
-            height: 0
+            height: 0.0
         } 
     }
 
-    pub fn set(position: Vector2<f32>, angle: f32, height: i16) -> Self {
+    pub fn set(position: Vector2<f32>, angle: f32, height: f32) -> Self {
         Transform {
             position: position,
             angle: angle,
@@ -43,7 +43,7 @@ impl Transform {
         self.angle
     }
 
-    pub fn height(&self) -> i16 {
+    pub fn height(&self) -> f32 {
         self.height
     }
 
@@ -56,7 +56,7 @@ impl Transform {
     }
 
     pub fn height_as_int(&self) -> i16 {
-        self.height
+        self.height.round() as i16
     }
 
 }
@@ -74,7 +74,7 @@ pub trait Actor {
     // Transform alias
     fn position(&self) -> &Vector2<f32>;
     fn angle(&self) -> f32;
-    fn height(&self) -> i16;
+    fn height(&self) -> f32;
 
     // Transform
     fn get_last_transform(&self) -> &Transform;
@@ -95,7 +95,7 @@ pub struct Player {
     control_direction: Vector2<f32>, 
     control_angle: f32,
     control_angle_update: f32,
-    player_jump: i16,
+    player_jump: f32,
     player_jump_lock: bool,
 }
 
@@ -107,7 +107,7 @@ impl Player {
                 Vector2::<f32>::from(&position_i16)
             },  
             thing.angle as f32, 
-            configure.player.height)
+            configure.player.height as f32)
         };
         let thing_type =  ThingType::try_from(thing.type_id).unwrap_or(ThingType::Unknown);
         Box::new(Player {
@@ -122,7 +122,7 @@ impl Player {
             control_direction: Vector2::zeros(),
             control_angle: 0.0,
             control_angle_update: 0.0,
-            player_jump: 0,
+            player_jump: 0.0,
             player_jump_lock: false
         })
     }
@@ -131,11 +131,12 @@ impl Player {
 #[allow(unused_variables)]
 impl Actor for Player {
     fn update<'wad>(&mut self, engine: &Doom<'wad>, last_frame_time: f64, blending_factor: f64) {
+        let last_frame_time = last_frame_time as f32;
         self.last_transform = self.transform.clone();
         // Angle
         if self.control_angle != 0.0 {
             self.control_angle /= self.control_angle_update;
-            self.transform.angle = normalize_degrees(self.transform.angle + (self.control_angle * self.configure.angle_speed));
+            self.transform.angle = normalize_degrees(self.transform.angle + (self.control_angle * self.configure.angle_speed * last_frame_time));
             self.control_angle = 0.0;
             self.control_angle_update = 0.0;
         }
@@ -152,21 +153,22 @@ impl Actor for Player {
                 direction.x * psin + direction.y * pcos,
             ) * self.configure.speed;
             // New position
-            self.transform.position += velocity;
+            self.transform.position += velocity * last_frame_time;
         }
         // Height
         if self.player_jump_lock {
-            self.player_jump -= self.configure.jump_speed;
-            if self.player_jump <= 0 {
+            self.player_jump -= self.configure.jump_speed * last_frame_time;
+            if self.player_jump <= 0.0 {
                 self.player_jump_lock = false;
-                self.player_jump = 0;
+                self.player_jump = 0.0;
             }
         }
-        self.transform.height = engine.bsp.floor_height(&self.transform.position_as_int()) + self.configure.height + self.player_jump;
+        self.transform.height = engine.bsp.floor_height(&self.transform.position_as_int()) as f32 + self.configure.height as f32 + self.player_jump;
 
     }
 
     fn control(&mut self, input: &WinitInputHelper, last_frame_time: f64, blending_factor: f64) {
+        let last_frame_time = last_frame_time as f32;
         if  input.key_held(KeyCode::KeyW) 
         && !input.key_held(KeyCode::KeyS) {
             self.control_direction += Vector2::new(0.0, 1.0);
@@ -196,8 +198,8 @@ impl Actor for Player {
         if input.key_held(KeyCode::KeyE) 
         && self.player_jump < self.configure.jump
         && !self.player_jump_lock {
-            self.player_jump += self.configure.jump_speed;
-        } else if self.player_jump != 0 {
+            self.player_jump += self.configure.jump_speed * last_frame_time;
+        } else if self.player_jump != 0.0 {
             self.player_jump_lock = true;
         }
     }
@@ -230,7 +232,7 @@ impl Actor for Player {
         self.transform.angle()
     }
 
-    fn height(&self) -> i16 {
+    fn height(&self) -> f32 {
         self.transform.height()
     }
 
